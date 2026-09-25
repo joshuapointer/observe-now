@@ -42,6 +42,7 @@ export function StatusHeader({ right }: { right?: ReactNode }) {
   return (
     <View style={{ backgroundColor: t.c.chrome, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
       <View style={styles.statusRow}>
+        <EnvBadge />
         <View style={[styles.pill, { backgroundColor: offline ? t.c.danger : "rgba(255,255,255,0.14)", borderRadius: t.colorful ? 999 : 0, flexShrink: 1 }]}>
           {offline ? null : <View style={[styles.dot, { backgroundColor: t.c.live }]} />}
           <Text maxFontSizeMultiplier={1.3} numberOfLines={isTablet ? 1 : 2} style={[t.font("bold"), { color: "#fff", fontSize: 13, flexShrink: 1 }]}>{left}</Text>
@@ -67,9 +68,11 @@ export function CareHeader({ title, record }: { title: string; record?: boolean 
   return (
     <View>
       <StatusHeader right={<ChromeButton label={`End ${V.onShift?.name || ""}'s shift`} title={isTablet ? `${shiftName} · End shift` : `${shiftName} · End`} onPress={endShift} />} />
-      <View style={[styles.titleRow, { backgroundColor: t.c.ground, borderBottomColor: t.colorful ? t.c.line : t.c.edge, borderBottomWidth: t.colorful ? 1 : 2 }]}>
+      <View style={[styles.titleRow, { backgroundColor: t.c.ground, borderBottomColor: t.colorful ? t.c.line : t.c.edge, borderBottomWidth: t.colorful ? 1 : 2 }, !isTablet && { flexWrap: "wrap", rowGap: 4 }]}>
+        {/* On phones the title gets its own line so it's never cut short; the day and countdown sit under it. */}
+        {isTablet ? null : <Text maxFontSizeMultiplier={1.3} numberOfLines={1} adjustsFontSizeToFit style={[t.font("black"), { color: t.c.ink, fontSize: 22, width: "100%" }]}>{title}</Text>}
         <View style={{ flex: 1, gap: 2 }}>
-          <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={[t.font("black"), { color: t.c.ink, fontSize: isTablet ? 26 : 22 }]}>{title}</Text>
+          {isTablet ? <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={[t.font("black"), { color: t.c.ink, fontSize: 26 }]}>{title}</Text> : null}
           <Text maxFontSizeMultiplier={1.3} style={[t.font("semibold"), { color: t.c.mute, fontSize: 14 }]}>
             <Text style={t.font("heavy")}>{V.ctx.name}</Text> · {M.dayLong(info.start)}
             {record ? (
@@ -128,7 +131,17 @@ export function Toast() {
   );
 }
 
-// A fixed marker on every screen of anything that isn't production, so dev is never mistaken for prod.
+// A marker on every screen of anything that isn't production, so dev is never mistaken for prod: inside the
+// status bar once signed in, floating in the corner on the sign-in and shift screens.
+function EnvBadge() {
+  if (ENV === "prod") return null;
+  return (
+    <View style={[styles.envInline]} accessibilityLabel={ENV === "demo" ? "Practice mode" : "Development version"}>
+      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>{ENV === "demo" ? "PRACTICE" : "DEV"}</Text>
+    </View>
+  );
+}
+
 export function EnvTag() {
   const insets = useSafeAreaInsets();
   if (ENV === "prod") return null;
@@ -148,5 +161,6 @@ const styles = StyleSheet.create({
   yesterday: { paddingHorizontal: 16, paddingVertical: 8 },
   toast: { flexDirection: "row", alignItems: "center", gap: 12, paddingLeft: 18, paddingRight: 8, paddingVertical: 8, minHeight: 52, maxWidth: 560, marginHorizontal: 16 },
   undo: { paddingHorizontal: 16, paddingVertical: 8 },
+  envInline: { backgroundColor: "rgba(200,40,40,0.9)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
   env: { position: "absolute", right: 6, backgroundColor: "rgba(200,40,40,0.85)", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
 });

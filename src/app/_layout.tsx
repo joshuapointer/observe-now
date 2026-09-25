@@ -79,7 +79,7 @@ function RootNav() {
       </Stack>
       <ModalHost />
       <Toast />
-      <EnvTag />
+      {mode === "gate" ? <EnvTag /> : null}
     </ThemeProvider>
   );
 }
