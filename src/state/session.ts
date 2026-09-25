@@ -48,9 +48,10 @@ export function sync() {
         if (pid !== get().pid) return;
         // Only the server can say they've lost access; a cache miss while offline must never unlink them.
         if (!m) { if (!meta.fromCache) lostAccess(); return; }
-        const first = !get().member;
+        const prev = get().member;
         set({ member: m });
-        if (first) onMember();
+        if (!prev) onMember();
+        else if (prev.role !== m.role) sync(); // role changed: start or stop the caregiver-only watchers
       }, () => lostAccess()));
       if (S.member) {
         const caregiver = S.member.role === "caregiver";
@@ -139,7 +140,7 @@ export function selectPatient(pid: string | null) {
     target: null, pendingCodes: [], trends: null, follow: true, sid: M.sidAt(Date.now()),
     place: "", pain: "—", details: false, openSection: null, // half-filled entries belong to the patient they were started for
     pickerOpen: false, addingPatient: false, modal: null, medForm: null, stripCollapsed: false,
-    drafts: pid ? kv.get(`gl:drafts:${pid}`, {}) : {},
+    drafts: pid && get().user ? kv.get(`gl:drafts:${get().user!.uid}:${pid}`, {}) : {},
   });
   ensuring.clear();
   if (get().user) {
@@ -225,6 +226,9 @@ export function boot() {
       if (cur !== S.sid) viewDay(cur, true);
     }
   }, 10000);
+  // …and exactly on each 15-minute boundary, so the highlighted box never lags the box a save goes into.
+  const atBoundary = () => setTimeout(() => { useNow.setState({ now: Date.now() }); atBoundary(); }, M.SLOT_MS - (Date.now() % M.SLOT_MS) + 50);
+  atBoundary();
   setInterval(beat, 30000);
 
   let hiddenAt = 0;

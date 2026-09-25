@@ -17,7 +17,9 @@ const tap = () => Haptics.selectionAsync().catch(() => {});
 const done = () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
 // ---- drafts (kept per patient, so a half-typed note survives the app closing) ----
-const saveDrafts = () => { const S = get(); if (S.pid) kv.set(`gl:drafts:${S.pid}`, S.drafts); };
+// Keyed by login as well as patient, so another account on a shared device never gets someone else's half-typed text.
+export const draftsKey = (uid: string, pid: string) => `gl:drafts:${uid}:${pid}`;
+const saveDrafts = () => { const S = get(); if (S.pid && S.user) kv.set(draftsKey(S.user.uid, S.pid), S.drafts); };
 export function setDraft(k: keyof Drafts, v: string) { set({ drafts: { ...get().drafts, [k]: v } }); saveDrafts(); }
 function clearDrafts(...ks: (keyof Drafts)[]) {
   const drafts = { ...get().drafts };
@@ -104,11 +106,11 @@ async function markFall() {
   const codes = Array.from(new Set([...M.entryCodes(existing), ...S.pendingCodes, "FL"]));
   const data = { slot: v.targetIdx, slotStart: v.info.start + v.targetIdx * M.SLOT_MS, codes, place: existing?.place || S.place || "", pain: existing?.pain || "—", note: existing?.note || "", markedAt: now, ...byFields(), ...(existing?.med ? { med: true } : {}) };
   const answers = Object.fromEntries(FALL_QUESTIONS.map(([q]) => [q, null]));
-  set({ pendingCodes: [], target: null, openSection: null });
-  clearDrafts("fallNarr");
-  router.push("/fall");
+  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, openSection: null });
+  clearDrafts("fallNarr", "note");
+  router.navigate("/fall");
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-  await run(store().batch([
+  run(store().batch([
     { path: entryPath(S.sid, v.key), data, merge: true },
     { path: `${dayPath(S.sid)}/alerts/${alertId}`, data: { kind: "fall", code: "FL", text: M.alertText("fall", v.ctx), at: now, entryKey: v.key, acks: {} }, merge: false },
     { path: dayPath(S.sid), data: { fall: { at: now, slotKey: v.key, alertId, answers, narrative: "", filedAt: null } } },
@@ -138,7 +140,7 @@ export async function commit() {
   clearDrafts("note");
   done();
   const path = entryPath(S.sid, v.key), prev = existing && strip(existing);
-  await run(store().batch(ops));
+  run(store().batch(ops));
   // Marks that raised an alert can't be quietly taken back; everything else can — undo restores exactly what was there.
   toast(kind ? "Saved — red alert sent to family" : `Saved ${M.hhmm(data.slotStart)}`,
     kind ? null : () => (prev ? store().setDoc(path, prev, false) : store().remove(path)));
@@ -147,7 +149,7 @@ export async function commit() {
 export function undo() {
   const fn = get().undo;
   clearToast();
-  if (fn) run(fn()).then(() => toast("Undone"));
+  if (fn) { run(fn()); toast("Undone"); }
 }
 
 // ---- changing or removing an entry from your own shift ----
@@ -191,11 +193,11 @@ export async function saveEdit(del: boolean) {
   const medOps = (vals: boolean) => (meds.length ? [{ path: dayPath(ed.sid), data: { meds: Object.fromEntries(meds.map(([n, t]) => [n, vals ? t : null])) } }] : []);
   set({ edit: null, modal: null });
   if (del) {
-    await run(Promise.all([store().remove(path), medOps(false).length ? store().batch(medOps(false)) : null]));
+    run(Promise.all([store().remove(path), medOps(false).length ? store().batch(medOps(false)) : null]));
   } else {
     const { med: _med, ...rest } = prev;
     const data = { ...(dropMed ? rest : prev), codes, place: ed.place, pain: ed.pain, note, editedAt: Date.now(), editedBy: onShift()!.name };
-    await run(store().batch([{ path, data, merge: false }, ...medOps(false)]));
+    run(store().batch([{ path, data, merge: false }, ...medOps(false)]));
   }
   toast(del ? `${when} entry deleted` : `${when} entry changed`, () => store().batch([{ path, data: prev, merge: false }, ...medOps(true)]));
 }
@@ -208,7 +210,7 @@ export async function giveMed(name: string) {
     ? { med: true }
     : { slot: i, slotStart: v.info.start + i * M.SLOT_MS, codes: ["MD"], place: "", pain: "—", note: "", markedAt: now, ...byFields(), med: true };
   done();
-  await run(store().batch([
+  run(store().batch([
     { path: dayPath(S.sid), data: { meds: { [name]: now } } },
     { path: entryPath(S.sid, key), data },
   ]));
@@ -227,13 +229,13 @@ export async function saveNote(privateOnly: boolean) {
   const join = (old?: string) => (old ? M.sentence(old) + " " : "") + text;
   clearDrafts("noteScreen");
   if (privateOnly) {
-    await run(store().setDoc(`${dayPath(S.sid)}/privateNotes/${key}`, { note: join(v.D.priv.find(p => p.id === key)?.note), at: Date.now(), ...byFields() }));
+    run(store().setDoc(`${dayPath(S.sid)}/privateNotes/${key}`, { note: join(v.D.priv.find(p => p.id === key)?.note), at: Date.now(), ...byFields() }));
     toast("Note saved — family can't see it");
   } else if (existing) {
-    await run(store().setDoc(entryPath(S.sid, key), { note: join(existing.note) }));
+    run(store().setDoc(entryPath(S.sid, key), { note: join(existing.note) }));
     toast("Note saved — family can see it");
   } else {
-    await run(store().setDoc(entryPath(S.sid, key), { slot: v.d.cur, slotStart: v.info.start + v.d.cur * M.SLOT_MS, codes: [], place: "", pain: "—", note: text, markedAt: Date.now(), ...byFields() }));
+    run(store().setDoc(entryPath(S.sid, key), { slot: v.d.cur, slotStart: v.info.start + v.d.cur * M.SLOT_MS, codes: [], place: "", pain: "—", note: text, markedAt: Date.now(), ...byFields() }));
     toast("Note saved — family can see it");
   }
 }
@@ -252,7 +254,7 @@ export async function medRemove(i: number) {
   if (!m) return;
   if (!(await ask({ title: `Remove ${m.name}?`, body: "It will no longer appear on the medicines list. Anything already recorded is kept.", yes: "Yes, remove it", destructive: true }))) return;
   set({ medForm: null });
-  await run(store().setDoc(PP(), { meds: meds.filter((_, j) => j !== i) }));
+  run(store().setDoc(PP(), { meds: meds.filter((_, j) => j !== i) }));
   toast(`${m.name} removed`);
 }
 export function medSave() {
@@ -280,15 +282,16 @@ let fallTimer: ReturnType<typeof setTimeout> | undefined;
 export function setFallNarrative(text: string) {
   setDraft("fallNarr", text);
   clearTimeout(fallTimer);
-  const sid = get().sid;
-  fallTimer = setTimeout(() => run(store().setDoc(dayPath(sid), { fall: { narrative: text } })), 600);
+  const path = dayPath(get().sid); // resolved now, so a patient switch within the delay can't redirect it
+  fallTimer = setTimeout(() => run(store().setDoc(path, { fall: { narrative: text } })), 600);
 }
 export async function fileFall() {
   const v = V(), f = v.day?.fall;
+  clearTimeout(fallTimer); // the narrative is saved with the report below
   if (!f || f.filedAt) return;
   if (!(await ask({ title: "Send the fall report to family?", body: "Everyone on the log will get it straight away.", yes: "Yes, send it" }))) return;
   const now = Date.now(), sid = get().sid;
-  await run(store().batch([
+  run(store().batch([
     { path: `${dayPath(sid)}/alerts/${store().newId(`${dayPath(sid)}/alerts`)}`, data: { kind: "fall-note", code: "FL", text: M.fallSummary(f, v.ctx), at: now, acks: {} }, merge: false },
     { path: dayPath(sid), data: { fall: { filedAt: now, narrative: get().drafts.fallNarr ?? f.narrative ?? "" } } },
   ]));
@@ -297,6 +300,11 @@ export async function fileFall() {
 
 // ---- trends ----
 export async function loadTrends() {
+  // Offline, the memory cache has at most today and yesterday: an honest message beats a week of empty nights.
+  if (!get().status.online && !store().demo) {
+    set({ trends: { nights: [], summary: { stats: [], insights: ["Couldn't load the last seven nights. Check the internet connection and try again."] } } });
+    return;
+  }
   set({ trends: { loading: true } });
   try {
     const nights = await M.loadNights(store(), PP(), Date.now());
@@ -310,7 +318,8 @@ export async function loadTrends() {
 // ---- shifts: the shared device stays signed in; whoever is on duty picks their name and enters their PIN ----
 function clearWorkInProgress() {
   set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, edit: null, openSection: null });
-  clearDrafts("note", "noteScreen");
+  // Everything half-typed goes with the caregiver who typed it, so the next one can't send it under their name.
+  clearDrafts("note", "noteScreen", "reply", "newmsg");
 }
 
 export const pickCaregiver = (id: string) => set({ pinFor: id, pin: "", pinError: "", cgForm: null });
@@ -353,7 +362,7 @@ export async function endShift() {
   if (!(await ask({ title: `End ${M.firstName(s.name)}'s shift?`, body: "The next caregiver will pick their name to start theirs. Everything recorded is kept.", yes: "Yes, end the shift" }))) return;
   set({ modal: null });
   clearWorkInProgress();
-  await run(store().batch([
+  run(store().batch([
     { path: `${PP()}/shiftLog/${s.id}`, data: { endedAt: Date.now() } },
     { path: PP(), data: { onShift: null } },
   ]));
@@ -369,7 +378,7 @@ export async function cgRemove(id: string) {
   if (onShift()?.cid === c.id) return toast(`${M.firstName(c.name)} is on shift now. End the shift first.`);
   if (!(await ask({ title: `Remove ${c.name}?`, body: "They won't be able to start a shift on this device. Everything they recorded is kept.", yes: "Yes, remove", destructive: true }))) return;
   set({ cgForm: null });
-  await run(store().remove(`${PP()}/caregivers/${c.id}`));
+  run(store().remove(`${PP()}/caregivers/${c.id}`));
   toast(`${c.name} removed`);
 }
 export async function cgSave(nameIn: string, pinIn: string) {
@@ -382,7 +391,7 @@ export async function cgSave(nameIn: string, pinIn: string) {
   const id = form.id || store().newId(`${PP()}/caregivers`);
   const data = { name, ...(pin ? { pin: await pinHash(id, pin) } : {}), ...(form.id ? {} : { createdAt: Date.now() }) };
   set({ cgForm: null });
-  await run(store().setDoc(`${PP()}/caregivers/${id}`, data));
+  run(store().setDoc(`${PP()}/caregivers/${id}`, data));
   toast(form.id ? `${name} updated` : S.modal === "caregivers" ? `${name} added` : `${name} added. Tap your name to start your shift.`);
 }
 
@@ -436,7 +445,7 @@ export function saveDetails(v: { name: string; careSetting: string; onCallPhone:
   const name = v.name.trim(), S = get();
   if (!name) return toast("Their name can't be empty.");
   run(store().batch([
-    { path: PP(), data: { name, careSetting: v.careSetting.trim() || "Home, 24-hour care", onCallPhone: v.onCallPhone.trim() } },
+    { path: PP(), data: { name, careSetting: v.careSetting.trim() || "Home, 24-hour care", onCallPhone: v.onCallPhone.replace(/[^\d+ ()-]/g, "").trim() } },
     ...(S.links?.some(l => l.id === S.pid) ? [{ path: `users/${uid()}/patients/${S.pid}`, data: { name } }] : []),
   ]));
   set({ modal: null });
@@ -498,8 +507,7 @@ export function sendNew() {
   // Always today's log, even while looking at yesterday, so family see it at the top of their list.
   const id = sendMessage(M.sidAt(Date.now()), { who: M.firstName(s.name), role: "caregiver", cid: s.cid, text });
   set({ thread: id });
-  // The new thread shows up once its snapshot arrives; mark it read then too.
-  setTimeout(() => markThreadRead(id), 500);
+  markThreadRead(id); // a no-op until its snapshot arrives; the Messages screen marks it again then
   toast("Sent to family");
 }
 export const replyTo = (id: string | null) => set({ replyTo: id });
@@ -553,6 +561,9 @@ export const demoSignIn = (role: "caregiver" | "family") => store().signIn(role)
 
 export async function signOut() {
   if (isCaregiver() && !(await ask({ title: "Sign this device out?", body: "Someone will need the account's email and password to sign it back in. To hand over to the next caregiver, use End shift instead.", yes: "Yes, sign out", destructive: true }))) return;
+  clearTimeout(fallTimer);
+  const S = get();
+  if (S.pid && S.user) kv.del(draftsKey(S.user.uid, S.pid)); // nothing half-typed stays on a shared device
   dropAll();
   set({ drafts: {}, toast: "", undo: null, modal: null });
   await store().signOut();

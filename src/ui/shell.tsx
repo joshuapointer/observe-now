@@ -35,7 +35,7 @@ export function StatusHeader({ right }: { right?: ReactNode }) {
   const status = useApp(s => s.status), isFamily = useApp(s => s.member?.role === "family");
   const offline = !status.online;
   const left = offline
-    ? `No internet — ${isFamily ? "showing the last update" : "entries are kept on this device and will send when it's back"}`
+    ? `No internet — ${isFamily ? "showing the last update" : "entries will send when it's back. Keep the app open until then"}`
     : isFamily
       ? `Live from ${V.ctx.caregiver}`
       : V.live.length ? `${V.live.length} family watching` : "No family watching";

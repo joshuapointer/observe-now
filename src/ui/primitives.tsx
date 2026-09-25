@@ -2,7 +2,7 @@
 // (Colorful / Classic) and both screens (Light / Night) stay consistent everywhere.
 import { forwardRef, useRef, useState, type ReactNode } from "react";
 import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type PressableProps, type ScrollViewProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
 } from "react-native";
 
@@ -237,6 +237,8 @@ export const Field = forwardRef<TextInput, FieldProps>(function Field({ label, h
       ref={ref}
       placeholderTextColor={t.c.label}
       multiline={multiline}
+      accessibilityLabel={label}
+      accessibilityHint={hint}
       maxFontSizeMultiplier={1.5}
       {...rest}
       style={[
@@ -254,9 +256,10 @@ export const Field = forwardRef<TextInput, FieldProps>(function Field({ label, h
   if (!label && !hint) return input;
   return (
     <View style={{ gap: 6 }}>
-      {label ? <T v="label">{label}</T> : null}
+      {/* The input itself carries the label and hint, so screen readers read them together with the field. */}
+      {label ? <T v="label" accessibilityElementsHidden importantForAccessibility="no">{label}</T> : null}
       {input}
-      {hint ? <T v="small">{hint}</T> : null}
+      {hint ? <T v="small" accessibilityElementsHidden importantForAccessibility="no">{hint}</T> : null}
     </View>
   );
 });
@@ -282,7 +285,8 @@ export const Scroll = forwardRef<ScrollView, ScrollViewProps>(function Scroll({ 
 });
 
 // Wrap anything with a text box pinned to the bottom (composers, the Step 2 panel on phones).
-// KeyboardAvoidingView measures itself relative to its parent, so it's told where on screen that parent
+// Padding on both platforms: Android is edge to edge (SDK 57), so the window no longer resizes for the keyboard
+// and "height" goes wrong after rotation. KeyboardAvoidingView measures itself relative to its parent, so it's told where on screen that parent
 // starts (below headers); pass `offset` only to override the measurement.
 export function KeyboardArea({ children, offset, style }: { children: ReactNode; offset?: number; style?: StyleProp<ViewStyle> }) {
   const wrap = useRef<View>(null);
@@ -290,7 +294,7 @@ export function KeyboardArea({ children, offset, style }: { children: ReactNode;
   const measure = () => wrap.current?.measureInWindow((_x, y) => setTop(y));
   return (
     <View ref={wrap} onLayout={measure} style={[{ flex: 1 }, style]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={offset ?? top}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={offset ?? top}>
         {children}
       </KeyboardAvoidingView>
     </View>

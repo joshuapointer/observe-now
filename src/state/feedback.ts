@@ -16,13 +16,16 @@ export function clearToast() {
   set({ toast: "", undo: null });
 }
 
-// Firestore queues writes while offline; a rejection means the server refused (permissions, etc.).
-export function run<T>(p: Promise<T> | T) {
-  return Promise.resolve(p).catch((e: { code?: string }) => {
+// Firestore applies a write on this device at once and queues it while offline, but the promise only settles
+// when the server answers — which can be hours away. So callers confirm straight away and never await this;
+// it only speaks up if the server refuses (permissions, etc.). Resolves to whether the write went through.
+export function run<T>(p: Promise<T> | T): Promise<boolean> {
+  return Promise.resolve(p).then(() => true, (e: { code?: string }) => {
     console.error(e);
     toast(e?.code === "permission-denied"
       ? "That didn't save — you don't have permission to do that."
       : "That didn't save yet. It will be tried again automatically.");
+    return false;
   });
 }
 

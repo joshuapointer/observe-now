@@ -56,12 +56,13 @@ export function AuthView() {
           returnKeyType="next"
         />
         <View style={{ gap: 6 }}>
-          <T v="label">{up ? "Choose a password (at least 6 characters)" : "Password"}</T>
+          <T v="label" accessibilityElementsHidden importantForAccessibility="no">{up ? "Choose a password (at least 6 characters)" : "Password"}</T>
           <Row gap={8}>
             <Field
               style={{ flex: 1 }}
               value={password}
               onChangeText={setPassword}
+              accessibilityLabel={up ? "Choose a password (at least 6 characters)" : "Password"}
               secureTextEntry={!showPw}
               autoCapitalize="none"
               autoCorrect={false}

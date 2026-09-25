@@ -4,6 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePathname } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { APP_NAME } from "@/lib/config";
 import { PLACES, PAINS, type Med } from "@/lib/codes";
@@ -432,6 +433,10 @@ export function ModalHost() {
   const modal = useApp(s => s.modal);
   const { isTablet } = useLayout();
   const t = useTheme();
+  // iOS shows these as sheets below the status bar. Android draws them edge to edge, so keep the title bar and
+  // the buttons clear of the status and navigation bars.
+  const insets = useSafeAreaInsets();
+  const edges = Platform.OS === "android" ? { paddingTop: insets.top, paddingBottom: insets.bottom } : null;
 
   if (!modal) return null;
   return (
@@ -441,7 +446,7 @@ export function ModalHost() {
       presentationStyle={Platform.OS === "ios" ? (isTablet ? "formSheet" : "pageSheet") : undefined}
       onRequestClose={closeModal}
     >
-      <View style={{ flex: 1, backgroundColor: t.c.bg }}>
+      <View style={[{ flex: 1, backgroundColor: t.c.bg }, edges]}>
         <ModalContent modal={modal} />
       </View>
     </Modal>

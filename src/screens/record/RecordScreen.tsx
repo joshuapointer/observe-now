@@ -34,7 +34,7 @@ function Bars({ V, t, canLog }: { V: ViewModel; t: Theme; canLog: boolean }) {
     <>
       {f && !f.filedAt ? (
         <AlertBar t={t} bold text={`The fall report from ${M.hhmm(f.at)} hasn't been sent yet.`}>
-          <Button kind="danger" title="Finish the fall report" onPress={() => router.push("/fall")} />
+          <Button kind="danger" title="Finish the fall report" onPress={() => router.navigate("/fall")} />
         </AlertBar>
       ) : null}
       {V.missed.length ? (

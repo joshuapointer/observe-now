@@ -88,7 +88,7 @@ export function FallScreen() {
           onPress={fileFall}
         />
         {onCallPhone ? (
-          <Button title="Call the on-call nurse" onPress={() => Linking.openURL(`tel:${onCallPhone}`)} />
+          <Button title="Call the on-call nurse" onPress={() => Linking.openURL(`tel:${onCallPhone.replace(/[^\d+]/g, "")}`)} />
         ) : (
           <View style={{ gap: 4 }}>
             <Button title="Call the on-call nurse" disabled onPress={() => {}} />

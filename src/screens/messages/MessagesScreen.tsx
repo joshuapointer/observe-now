@@ -88,12 +88,16 @@ export function MessagesScreen() {
 
   // Keeps the currently open conversation selected (and read) whenever this screen has focus, and marks a
   // reply as read the instant it arrives while the conversation is open — mirrors the PWA's tab(id) switch.
+  // On a phone the conversation is only on screen once it's been opened; showing the list alone must not mark
+  // anything read, or the unread badge would clear for messages nobody has seen.
+  const chatVisible = isTablet || phoneOpen;
   useFocusEffect(
     useCallback(() => {
+      if (!chatVisible) return;
       if (thread !== "new") openThread(openThreadId());
-      setOnNotes(() => markThreadRead(openThreadId()));
+      setOnNotes(() => markThreadRead(thread === "new" ? null : openThreadId()));
       return () => setOnNotes(null);
-    }, [thread]),
+    }, [thread, chatVisible]),
   );
 
   const sel = thread === "new" ? null : V.threads.find(x => x.root.id === thread) || V.threads[0] || null;

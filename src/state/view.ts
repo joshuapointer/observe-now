@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { alertKind, type AlertKind } from "@/lib/codes";
 import * as M from "@/lib/model";
@@ -12,7 +13,15 @@ export type Thread = { root: Message; replies: Message[]; last: number };
 export const fromCaregiver = (n: Message) => n.role === "caregiver";
 
 // Everything the screens need, computed once per state change (port of the PWA's compute()).
-export function compute(S: AppState, now: number) {
+// The fields compute() reads. useView subscribes to just these, so typing a note, a toast or a PIN key doesn't
+// recompute and re-render every screen that shows the log.
+type ViewInput = Pick<AppState, "sid" | "data" | "patient" | "members" | "presence" | "reg" | "target" | "pain" | "pendingCodes" | "msgReadAt" | "pid" | "threadRead" | "roster" | "settings" | "user">;
+const pickInput = (S: AppState): ViewInput => ({
+  sid: S.sid, data: S.data, patient: S.patient, members: S.members, presence: S.presence, reg: S.reg, target: S.target, pain: S.pain,
+  pendingCodes: S.pendingCodes, msgReadAt: S.msgReadAt, pid: S.pid, threadRead: S.threadRead, roster: S.roster, settings: S.settings, user: S.user,
+});
+
+export function compute(S: ViewInput, now: number) {
   const info = M.dayInfo(S.sid);
   const D = S.data[S.sid] || EMPTY, PD = S.data[M.prevSid(S.sid)] || EMPTY;
   const p = S.patient || ({} as NonNullable<AppState["patient"]>), day = D.day;
@@ -75,7 +84,7 @@ export function compute(S: AppState, now: number) {
 export type View = ReturnType<typeof compute>;
 
 export function useView(): View {
-  const S = useApp();
+  const S = useApp(useShallow(pickInput));
   const now = useNow(s => s.now);
   return useMemo(() => compute(S, now), [S, now]);
 }
