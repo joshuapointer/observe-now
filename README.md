@@ -17,8 +17,12 @@ npm run demo      # practice mode: local data only, never touches Firebase
 npm start         # the dev Firebase project (garth-log-dev)
 ```
 
-Then press `i` for the iOS Simulator (or scan the QR code with Expo Go on a phone/iPad), `a` for an Android
-emulator. `mise run demo` / `mise run start` do the same.
+Then press `i` for the iOS Simulator, `a` for an Android emulator, or run it on a real phone/iPad: install
+**Expo Go**, join the same Wi-Fi as the Mac, and scan the QR code Metro prints with the Camera app (or type the
+`exp://<mac-ip>:8081` URL into Expo Go). Saving a file reloads every connected device. `mise run demo` /
+`mise run start` do the same. Signed in to Expo Go with the account that ran `npx expo login`, the server also
+shows up in Expo Go's list, no QR needed. After switching environment, restart Metro with `--clear` so the new
+value is inlined.
 
 **Practice mode** has the same seed data as the PWA's demo: sign in as *the care iPad* or as *Ellen (family)*;
 caregivers are Dana R. and Sam K., and both PINs are **1234**. A red "PRACTICE", "DEV" or "BETA" tag shows on every
@@ -26,15 +30,60 @@ screen of anything that isn't production.
 
 ### Environments
 
-| `EXPO_PUBLIC_APP_ENV` | Backend |
-| --- | --- |
-| `dev` (default) | `garth-log-dev` |
-| `beta` | `garth-log-dev` (the TestFlight app) |
-| `prod` | `behavior-observation-2d03f` — real people's data |
-| `demo` | none (on-device practice store) |
+| `EXPO_PUBLIC_APP_ENV` | Backend | Run locally |
+| --- | --- | --- |
+| `dev` (default) | `garth-log-dev` | `npm start` |
+| `beta` | `garth-log-dev` (the TestFlight app) | `EXPO_PUBLIC_APP_ENV=beta npx expo start` |
+| `prod` | `behavior-observation-2d03f` — real people's data | `EXPO_PUBLIC_APP_ENV=prod npx expo start` |
+| `demo` | none (on-device practice store) | `npm run demo` |
+
+The same variable picks the app identity in `app.config.ts`, so each environment is its own installable app and
+only "Observe Now" can reach prod:
+
+| EAS profile | App | Bundle id | Backend | Ships via |
+| --- | --- | --- | --- | --- |
+| `dev` | Observe Now Dev | `com.joshpointer.observenow.dev` | `garth-log-dev` | internal (registered devices) |
+| `beta` | Observe Now Beta | `com.joshpointer.observenow.beta` | `garth-log-dev` | TestFlight |
+| `production` | Observe Now | `com.joshpointer.observenow` | `behavior-observation-2d03f` | App Store |
 
 The Firebase web configs in `src/lib/config.ts` are the public web-app configs Firebase Hosting serves at
 `/__/firebase/init.json`; they are not secrets. Dev is the default so a stray build can never write to prod.
+
+## Branches and releases
+
+Code lives at `github.com/joshuapointer/observe-now`; the EAS project is
+[`@joshpointer-dev/observe-now`](https://expo.dev/accounts/joshpointer-dev/projects/observe-now).
+
+| Branch | Push does |
+| --- | --- |
+| `dev` | nothing — day-to-day work, test with Expo Go |
+| `beta` | builds Observe Now Beta and uploads it to **TestFlight** (`.eas/workflows/beta.yml`) |
+| `main` | builds Observe Now and uploads it to **App Store Connect** (`.eas/workflows/production.yml`); it lands in TestFlight, and going live is a manual "Submit for Review" there |
+
+```sh
+git switch beta && git merge dev && git push && git switch dev   # → TestFlight
+git push origin beta:main                                        # → App Store Connect (fast-forward beta onto main)
+```
+
+Every push to `beta` or `main` spends an EAS build, so batch changes on `dev` first.
+
+### One-time EAS setup
+
+The workflows only run once these are done. The Apple steps prompt for your Apple ID and 2FA, so run them in a
+normal terminal (needs a paid Apple Developer account):
+
+1. `npx expo login` (or `npx expo login --browser`) as `joshpointer-dev`.
+2. `npx eas-cli@latest build -p ios --profile beta --auto-submit` — let EAS generate the certificate and
+   provisioning profile, create the App Store Connect app, and **create an App Store Connect API key** (that key is
+   what lets the workflows submit without you).
+3. The same with `--profile production` (or just `npx eas-cli@latest credentials -p ios` → `production` to set up
+   signing and the API key without shipping a build).
+4. On expo.dev: project → **Settings → GitHub**, install the Expo GitHub app and pick `joshuapointer/observe-now`.
+5. Optional, for `dev` builds on your own devices: `npx eas-cli@latest device:create`, then
+   `npx eas-cli@latest build -p ios --profile dev`.
+
+If a workflow's submit step asks for `ascAppId`, add each app's Apple ID (App Store Connect → App Information) to
+the matching `submit` profile in `eas.json` as `"ios": { "ascAppId": "…" }`.
 
 ## Checks
 
@@ -91,18 +140,8 @@ src/screens/        the screens
   sent when the connection returns *as long as the app stays open*; the PWA's IndexedDB cache survived a
   restart. The app guards against the one dangerous case (an offline cold start mistaking "no cached data"
   for "you've lost access") by only acting on server answers.
-- **Store builds** have an EAS project (`@joshpointer-dev/observe-now`) but none has been made yet. `eas.json`
-  pins the backend per profile, and `app.config.ts` gives each its own app, so all three install side by side:
-
-  | Profile | App | Bundle id | Backend | Ships via |
-  | --- | --- | --- | --- | --- |
-  | `dev` | Observe Now Dev | `com.joshpointer.observenow.dev` | `garth-log-dev` | internal (registered devices) |
-  | `beta` | Observe Now Beta | `com.joshpointer.observenow.beta` | `garth-log-dev` | TestFlight — push to `beta` |
-  | `production` | Observe Now | `com.joshpointer.observenow` | `behavior-observation-2d03f` | App Store — push to `main` |
-
-  The pushes run `.eas/workflows/beta.yml` and `production.yml` once GitHub is linked on expo.dev. Each
-  uploads to App Store Connect; releasing to the App Store stays a manual step there. By hand:
-  `npx eas-cli@latest build -p ios --profile beta --auto-submit`.
+- **No store build has been made yet** — the EAS project, profiles and workflows exist, but the one-time setup
+  above hasn't been run.
 - **Before a production build**, the prod Firebase web API key may be locked to the PWA's website (HTTP
   referrers). React Native sends no referrer, so give the app its own key restricted to Identity Toolkit,
   Token Service and Firestore instead of loosening the PWA's. (The dev key was checked: sign-in reaches it.)
