@@ -5,9 +5,9 @@ name: Firestore rules
 on:
   push:
     branches: [dev, beta, main]
-    paths: [firebase/firestore.rules, firebase/firestore.indexes.json, firebase/rules.test.mjs, firebase.json, .firebaserc]
+    paths: [firebase/firestore.rules, firebase/firestore.indexes.json, firebase/rules.test.mjs, firebase.json, .firebaserc, .github/workflows/firestore.yml]
   pull_request:
-    paths: [firebase/firestore.rules, firebase/firestore.indexes.json, firebase/rules.test.mjs, firebase.json, .firebaserc]
+    paths: [firebase/firestore.rules, firebase/firestore.indexes.json, firebase/rules.test.mjs, firebase.json, .firebaserc, .github/workflows/firestore.yml]
   workflow_dispatch:
 
 concurrency: firestore-${{ github.ref }}
