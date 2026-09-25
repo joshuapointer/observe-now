@@ -1,0 +1,129 @@
+import { getCalendars } from "expo-localization";
+import { create } from "zustand";
+
+import { DEFAULT_REGISTRY, type Registry } from "@/lib/codes";
+import { kv } from "@/lib/kv";
+import * as M from "@/lib/model";
+import type { SyncStatus, User } from "@/lib/store";
+import type { Caregiver, DayData, Invite, Link, Member, Patient, Presence } from "@/lib/types";
+
+export type Settings = {
+  plain: boolean; // everyday words instead of clinical codes
+  nudge: boolean; // countdown to the next entry
+  wake: boolean; // keep the screen on (caregiver device)
+  theme: "auto" | "light" | "night";
+  style: "colorful" | "classic";
+  clock: "auto" | "12" | "24";
+};
+
+export type ModalId =
+  | "help" | "welcome" | "meds" | "details" | "caregivers" | "people" | "edit-entry" | null;
+
+export type MedForm = { idx: number; name: string; dose: string; sched: string; dueAt: string; asNeeded: boolean };
+export type CodeForm = { id: string | null; short: string; abbr: string; long: string; section: string };
+export type CgForm = { id: string | null; name: string };
+export type EditForm = { sid: string; id: string; codes: string[]; med: boolean; place: string; pain: string; note: string };
+export type Drafts = Partial<Record<"note" | "noteScreen" | "fallNarr" | "reply" | "newmsg" | "familyNote", string>>;
+export type Trends = { loading: true } | { loading?: false; nights: M.Night[]; summary: { stats: M.TrendStat[]; insights: string[] } };
+
+export type AppState = {
+  authReady: boolean;
+  user: User | null;
+  authMode: "signin" | "signup";
+  authError: string;
+  authBusy: boolean;
+
+  pid: string | null;
+  links: Link[] | undefined;
+  pendingInvites: Invite[] | undefined;
+  legacyChecked: boolean;
+  pickerOpen: boolean;
+  addingPatient: boolean;
+
+  member: Member | null | undefined;
+  patient: Patient | null | undefined;
+  reg: Registry;
+  members: Member[];
+  presence: Presence[];
+  roster: Caregiver[] | undefined;
+  pinFor: string | null;
+  pin: string;
+  pinError: string;
+  cgForm: CgForm | null;
+
+  follow: boolean; // follow today (flip to the new day at midnight)
+  sid: string; // the day being viewed
+  data: Record<string, DayData>;
+
+  // Record screen
+  target: string | null; // a box other than the current one, being filled in
+  pendingCodes: string[];
+  place: string;
+  pain: string;
+  details: boolean;
+  openSection: string | null;
+  stripCollapsed: boolean;
+
+  drafts: Drafts;
+  medForm: MedForm | null;
+  codeForm: CodeForm | null;
+  edit: EditForm | null;
+  modal: ModalId;
+  settings: Settings;
+
+  msgReadAt: Record<string, number>;
+  threadRead: Record<string, number>;
+  thread: string | null; // open conversation id, or "new"
+  replyTo: string | null; // family: thread being replied to
+  lastVisit: number;
+  revealed: Record<string, boolean>;
+  trends: Trends | null;
+
+  toast: string;
+  undo: (() => Promise<unknown>) | null;
+  status: SyncStatus;
+};
+
+const DEFAULT_SETTINGS: Settings = { plain: true, nudge: true, wake: true, theme: "auto", style: "colorful", clock: "auto" };
+
+export const initialSession = (): Partial<AppState> => ({
+  pid: null, links: undefined, pendingInvites: undefined, legacyChecked: false, pickerOpen: false, addingPatient: false,
+  data: {}, member: undefined, patient: undefined, roster: undefined, members: [], presence: [], reg: DEFAULT_REGISTRY,
+  pinFor: null, pin: "", pinError: "", cgForm: null, edit: null, codeForm: null, medForm: null, thread: null, replyTo: null,
+  pendingCodes: [], target: null, place: "", pain: "—", details: false, openSection: null, msgReadAt: {}, trends: null,
+  modal: null, stripCollapsed: false,
+});
+
+export const useApp = create<AppState>(() => ({
+  ...(initialSession() as AppState),
+  authReady: false, user: null, authMode: "signin", authError: "", authBusy: false,
+  follow: true, sid: M.sidAt(Date.now()),
+  drafts: {},
+  settings: DEFAULT_SETTINGS,
+  threadRead: {},
+  lastVisit: 0,
+  revealed: {},
+  toast: "", undo: null,
+  status: { online: true, pending: 0, lastSync: 0 },
+}));
+
+// Called once kv has loaded: saved settings and the "last looked" time.
+export function hydrateApp() {
+  useApp.setState({
+    settings: { ...DEFAULT_SETTINGS, ...kv.get<Partial<Settings>>("gl:settings", {}) },
+    lastVisit: kv.get("gl:lastVisit", 0),
+  });
+}
+
+export const get = useApp.getState;
+export const set = useApp.setState;
+
+// The clock lives in its own tiny store so ticking it only re-renders what shows the time.
+export const useNow = create<{ now: number }>(() => ({ now: Date.now() }));
+
+// Display clock: Settings → Clock, where Auto follows the device. Applied whenever settings change, before
+// the components that show times re-render.
+const deviceUses12h = (() => { try { return getCalendars()[0]?.uses24hourClock === false; } catch { return false; } })();
+const applyClock = (c: Settings["clock"]) => { M.clock.h12 = c === "12" || (c !== "24" && deviceUses12h); };
+applyClock(useApp.getState().settings.clock);
+useApp.subscribe((s, prev) => { if (s.settings.clock !== prev.settings.clock) applyClock(s.settings.clock); });

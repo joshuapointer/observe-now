@@ -1,0 +1,14 @@
+[tools]
+node = "lts"
+
+[tasks.start]
+description = "Start Metro against the dev Firebase project (garth-log-dev)"
+run = "npx expo start"
+
+[tasks.demo]
+description = "Start Metro in practice mode (local data only, never touches Firebase)"
+run = "EXPO_PUBLIC_APP_ENV=demo npx expo start"
+
+[tasks.check]
+description = "Typecheck, lint and test"
+run = "npx tsc --noEmit && npx expo lint && npx jest"

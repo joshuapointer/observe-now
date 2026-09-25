@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+/android
+
+# autopilot / oh-my-claudecode state
+.omc/
