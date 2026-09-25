@@ -27,13 +27,16 @@ export type TProps = TextProps & { v?: TVariant; color?: string; center?: boolea
 export function T({ v = "body", color, center, weight, style, ...rest }: TProps) {
   const t = useTheme(), s = SIZES[v];
   const muted = v === "small" || v === "eyebrow";
+  // A caller that changes the size without a line height would otherwise get this variant's (smaller) one and clip.
+  const own = StyleSheet.flatten(style) as TextStyle | undefined;
+  const lineHeight = own?.fontSize && !own.lineHeight ? Math.round(own.fontSize * 1.3) : s.lh;
   return (
     <Text
       maxFontSizeMultiplier={1.6}
       {...rest}
       style={[
         t.font(weight || s.w),
-        { fontSize: s.size, lineHeight: s.lh, color: color || (muted ? t.c.mute : t.c.ink) },
+        { fontSize: s.size, lineHeight, color: color || (muted ? t.c.mute : t.c.ink) },
         s.upper && { textTransform: "uppercase", letterSpacing: s.ls },
         center && { textAlign: "center" },
         style,

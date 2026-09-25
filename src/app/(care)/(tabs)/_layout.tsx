@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router/tabs";
+import { Platform } from "react-native";
 
 import { useView } from "@/state/view";
 import { useLayout } from "@/ui/layout";
@@ -26,7 +27,9 @@ export default function CareTabs() {
         tabBarInactiveTintColor: t.c.mute,
         tabBarStyle: { backgroundColor: t.c.ground, borderTopColor: t.colorful ? t.c.line : t.c.edge, borderTopWidth: t.colorful ? 1 : 2 },
         tabBarLabelStyle: { ...t.font("bold"), fontSize: isTablet ? 14 : 11 },
-        tabBarHideOnKeyboard: true,
+        // Android only: there the keyboard pushes the tab bar up. On iOS the keyboard covers it anyway, and hiding
+        // it could leave it missing after the iPad keyboard's own dismiss key.
+        tabBarHideOnKeyboard: Platform.OS === "android",
         sceneStyle: { backgroundColor: t.c.bg },
       }}
     >

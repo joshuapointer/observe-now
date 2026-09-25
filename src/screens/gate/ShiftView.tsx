@@ -127,7 +127,7 @@ function PinKey({ k }: { k: string }) {
         t.colorful && t.shadow,
       ]}
     >
-      <T weight="heavy" style={{ fontSize: isDigit ? 28 : 15 }}>{label}</T>
+      <T weight="heavy" style={{ fontSize: isDigit ? 28 : k === "back" ? 24 : 15, lineHeight: isDigit || k === "back" ? 34 : 20 }}>{label}</T>
     </Pressable>
   );
 }

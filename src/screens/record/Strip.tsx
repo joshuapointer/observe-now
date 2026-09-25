@@ -55,7 +55,8 @@ type StripProps = { V: ViewModel; target: string | null; collapsed: boolean; gri
 export function Strip({ V, target, collapsed, grid, width, t }: StripProps) {
   const { info, d, ctx } = V;
   const missed = new Set(V.missed);
-  const cols = Math.max(6, Math.floor((width + GAP) / (60 + GAP)));
+  // Three hours per row (8 rows) whenever the boxes stay wide enough to read; otherwise as many as fit.
+  const cols = (width - GAP * 11) / 12 >= 46 ? 12 : Math.max(6, Math.floor((width + GAP) / (60 + GAP)));
   const boxW = grid ? Math.floor((width - GAP * (cols - 1)) / cols) : PHONE_BOX_W;
 
   const boxes = Array.from({ length: info.slots }, (_, i) => {
