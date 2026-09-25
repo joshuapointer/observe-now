@@ -1,7 +1,7 @@
 // Family's whole app (also shown to caregivers as a read-only "framed" preview).
 // Port of the PWA's familyView + the preview wrapper + familyRules (views.js).
-import { useMemo } from "react";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef } from "react";
+import { FlatList, Pressable, StyleSheet, View, type TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as M from "@/lib/model";
@@ -62,6 +62,9 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
   const revealed = useApp(s => s.revealed);
   const replyToId = useApp(s => s.replyTo);
   const draft = useApp(s => s.drafts.familyNote || "");
+  // Choosing "Reply" puts the cursor straight in the message box, as the PWA does.
+  const input = useRef<TextInput>(null);
+  useEffect(() => { if (replyToId && !framed) input.current?.focus(); }, [replyToId, framed]);
 
   const noteAllowed = !framed;
   const e = V.latest;
@@ -133,7 +136,7 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
           pressed && { opacity: 0.85 },
         ]}
       >
-        <T v="small" color={t.c.mute} style={{ width: 46 }}>{M.hhmm(x.markedAt)}</T>
+        <T v="small" color={t.c.mute} numberOfLines={1} style={{ width: M.clock.h12 ? 64 : 46 }}>{M.hhmm(x.markedAt)}</T>
         <View style={{ flex: 1 }}>
           <T weight={newFlag ? "bold" : undefined}>{M.entryLine(x, V.ctx, true)}</T>
           {by ? <T v="small" color={t.c.mute}>{by}</T> : null}
@@ -223,6 +226,7 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
         ]}
       >
         <Field
+          ref={input}
           style={{ flex: 1 }}
           value={draft}
           onChangeText={v => setDraft("familyNote", v)}

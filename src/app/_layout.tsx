@@ -65,7 +65,8 @@ function RootNav() {
 
   return (
     <ThemeProvider value={navTheme}>
-      <StatusBar style="light" />
+      {/* Signed-in screens have a dark chrome bar at the top; the sign-in and shift screens sit on the page colour. */}
+      <StatusBar style={mode === "gate" && !t.night ? "dark" : "light"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.c.bg }, animation: "fade" }}>
         <Stack.Protected guard={mode === "gate"}>
           <Stack.Screen name="(gate)/index" />

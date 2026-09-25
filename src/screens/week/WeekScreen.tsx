@@ -68,7 +68,7 @@ export function WeekScreen() {
   return (
     <Screen>
       <Scroll contentContainerStyle={{ padding: isTablet ? 24 : 16, gap: 18 }}>
-        <Row wrap gap={10}>
+        <Row wrap gap={10} style={{ alignItems: "stretch" }}>
           {summary.stats.map(s => (
             <Card key={s.label} pad={14} style={{ width: isTablet ? "23.5%" : "47.5%", gap: 4, minHeight: 86 }}>
               <T v="eyebrow">{s.label}</T>

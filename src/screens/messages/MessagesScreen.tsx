@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   threadFoot: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { paddingHorizontal: 8, paddingVertical: 1 },
   backRow: { flexDirection: "row", alignItems: "center", gap: 4, padding: 12, alignSelf: "flex-start" },
-  bar: { paddingHorizontal: 16, paddingVertical: 10 },
+  bar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10 },
   chatlog: { padding: 16, gap: 10, flexGrow: 1, justifyContent: "flex-end" },
   bubble: { maxWidth: "82%", padding: 10, borderRadius: 14, gap: 0 },
   replies: { marginLeft: 20, paddingLeft: 12, borderLeftWidth: 2, gap: 10 },

@@ -1,6 +1,6 @@
 // Shared building blocks. Screens compose these instead of styling from scratch, so both looks
 // (Colorful / Classic) and both screens (Light / Night) stay consistent everywhere.
-import { forwardRef, type ReactNode } from "react";
+import { forwardRef, useRef, useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type PressableProps, type ScrollViewProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
@@ -279,11 +279,18 @@ export const Scroll = forwardRef<ScrollView, ScrollViewProps>(function Scroll({ 
 });
 
 // Wrap anything with a text box pinned to the bottom (composers, the Step 2 panel on phones).
-export function KeyboardArea({ children, offset = 0, style }: { children: ReactNode; offset?: number; style?: StyleProp<ViewStyle> }) {
+// KeyboardAvoidingView measures itself relative to its parent, so it's told where on screen that parent
+// starts (below headers); pass `offset` only to override the measurement.
+export function KeyboardArea({ children, offset, style }: { children: ReactNode; offset?: number; style?: StyleProp<ViewStyle> }) {
+  const wrap = useRef<View>(null);
+  const [top, setTop] = useState(0);
+  const measure = () => wrap.current?.measureInWindow((_x, y) => setTop(y));
   return (
-    <KeyboardAvoidingView style={[{ flex: 1 }, style]} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={offset}>
-      {children}
-    </KeyboardAvoidingView>
+    <View ref={wrap} onLayout={measure} style={[{ flex: 1 }, style]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={offset ?? top}>
+        {children}
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 

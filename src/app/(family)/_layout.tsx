@@ -12,9 +12,9 @@ export default function FamilyLayout() {
         name="family-settings"
         options={{
           title: "Settings",
-          headerStyle: { backgroundColor: t.c.ground },
-          headerTintColor: t.c.accentInk,
-          headerTitleStyle: { ...t.font("heavy"), color: t.c.ink },
+          headerStyle: { backgroundColor: t.c.chrome }, // matches the status bar, whose text is always light
+          headerTintColor: t.c.onChrome,
+          headerTitleStyle: { ...t.font("heavy"), color: t.c.onChrome },
           headerBackTitle: "Back",
         }}
       />
