@@ -10,6 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.joshpointer.observenow",
+      "icon": "./assets/ObserveNow.icon",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"]
@@ -22,7 +23,7 @@
     "android": {
       "package": "com.joshpointer.observenow",
       "adaptiveIcon": {
-        "backgroundColor": "#201e1d",
+        "backgroundColor": "#433882",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
