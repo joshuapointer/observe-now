@@ -1,0 +1,21 @@
+# Every push to `main` builds "Observe Now" (prod backend) and uploads it to App Store Connect. It lands in
+# TestFlight; releasing it to the App Store is still a manual step there.
+name: Production to App Store Connect
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  build_ios:
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    type: submit
+    needs: [build_ios]
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production

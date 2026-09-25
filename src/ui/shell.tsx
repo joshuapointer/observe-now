@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ENV } from "@/lib/config";
+import { ENV_TAG } from "@/lib/config";
 import * as M from "@/lib/model";
 import { endShift, openModal, undo, viewToday, viewYesterday } from "@/state/actions";
 import { useApp } from "@/state/app";
@@ -134,20 +134,20 @@ export function Toast() {
 // A marker on every screen of anything that isn't production, so dev is never mistaken for prod: inside the
 // status bar once signed in, floating in the corner on the sign-in and shift screens.
 function EnvBadge() {
-  if (ENV === "prod") return null;
+  if (!ENV_TAG) return null;
   return (
-    <View style={[styles.envInline]} accessibilityLabel={ENV === "demo" ? "Practice mode" : "Development version"}>
-      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>{ENV === "demo" ? "PRACTICE" : "DEV"}</Text>
+    <View style={[styles.envInline]} accessibilityLabel={ENV_TAG.label}>
+      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>{ENV_TAG.text}</Text>
     </View>
   );
 }
 
 export function EnvTag() {
   const insets = useSafeAreaInsets();
-  if (ENV === "prod") return null;
+  if (!ENV_TAG) return null;
   return (
     <View pointerEvents="none" style={[styles.env, { top: insets.top + 2 }]}>
-      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>{ENV === "demo" ? "PRACTICE" : "DEV"}</Text>
+      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>{ENV_TAG.text}</Text>
     </View>
   );
 }

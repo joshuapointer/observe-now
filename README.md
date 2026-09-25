@@ -21,7 +21,7 @@ Then press `i` for the iOS Simulator (or scan the QR code with Expo Go on a phon
 emulator. `mise run demo` / `mise run start` do the same.
 
 **Practice mode** has the same seed data as the PWA's demo: sign in as *the care iPad* or as *Ellen (family)*;
-caregivers are Dana R. and Sam K., and both PINs are **1234**. A red "PRACTICE" or "DEV" tag shows on every
+caregivers are Dana R. and Sam K., and both PINs are **1234**. A red "PRACTICE", "DEV" or "BETA" tag shows on every
 screen of anything that isn't production.
 
 ### Environments
@@ -29,6 +29,7 @@ screen of anything that isn't production.
 | `EXPO_PUBLIC_APP_ENV` | Backend |
 | --- | --- |
 | `dev` (default) | `garth-log-dev` |
+| `beta` | `garth-log-dev` (the TestFlight app) |
 | `prod` | `behavior-observation-2d03f` — real people's data |
 | `demo` | none (on-device practice store) |
 
@@ -90,9 +91,18 @@ src/screens/        the screens
   sent when the connection returns *as long as the app stays open*; the PWA's IndexedDB cache survived a
   restart. The app guards against the one dangerous case (an offline cold start mistaking "no cached data"
   for "you've lost access") by only acting on server answers.
-- **Store builds** aren't set up (no EAS project yet). `eas.json` pins the backend per profile — `preview`
-  talks to dev, `production` to prod — so a build can't point at the wrong one. Bundle ids are
-  `com.joshpointer.observenow`. For a TestFlight/Play build: `npx eas-cli@latest build --profile production`.
+- **Store builds** have an EAS project (`@joshpointer-dev/observe-now`) but none has been made yet. `eas.json`
+  pins the backend per profile, and `app.config.ts` gives each its own app, so all three install side by side:
+
+  | Profile | App | Bundle id | Backend | Ships via |
+  | --- | --- | --- | --- | --- |
+  | `dev` | Observe Now Dev | `com.joshpointer.observenow.dev` | `garth-log-dev` | internal (registered devices) |
+  | `beta` | Observe Now Beta | `com.joshpointer.observenow.beta` | `garth-log-dev` | TestFlight — push to `beta` |
+  | `production` | Observe Now | `com.joshpointer.observenow` | `behavior-observation-2d03f` | App Store — push to `main` |
+
+  The pushes run `.eas/workflows/beta.yml` and `production.yml` once GitHub is linked on expo.dev. Each
+  uploads to App Store Connect; releasing to the App Store stays a manual step there. By hand:
+  `npx eas-cli@latest build -p ios --profile beta --auto-submit`.
 - **Before a production build**, the prod Firebase web API key may be locked to the PWA's website (HTTP
   referrers). React Native sends no referrer, so give the app its own key restricted to Identity Toolkit,
   Token Service and Firestore instead of loosening the PWA's. (The dev key was checked: sign-in reaches it.)

@@ -3,10 +3,17 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "preview": {
+    "dev": {
       "distribution": "internal",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_APP_ENV": "dev"
+      }
+    },
+    "beta": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "beta"
       }
     },
     "production": {
@@ -15,5 +22,9 @@
         "EXPO_PUBLIC_APP_ENV": "prod"
       }
     }
+  },
+  "submit": {
+    "beta": {},
+    "production": {}
   }
 }

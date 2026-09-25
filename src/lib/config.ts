@@ -1,10 +1,11 @@
 // Which backend the app talks to. Dev is the default so a stray build can't write to real people's logs.
 // The web configs are the public Firebase web-app configs (the same ones Firebase Hosting serves at
-// /__/firebase/init.json), so the app and the PWA share one Firestore per environment.
-export type AppEnv = "dev" | "prod" | "demo";
+// /__/firebase/init.json), so the app and the PWA share one Firestore per environment. Beta is the TestFlight
+// app: its own install, on the dev backend, so testers never touch real people's logs.
+export type AppEnv = "dev" | "beta" | "prod" | "demo";
 
 const raw = process.env.EXPO_PUBLIC_APP_ENV;
-export const ENV: AppEnv = raw === "prod" || raw === "demo" ? raw : "dev";
+export const ENV: AppEnv = raw === "prod" || raw === "beta" || raw === "demo" ? raw : "dev";
 export const DEMO = ENV === "demo";
 
 export type FirebaseWebConfig = {
@@ -16,7 +17,7 @@ export type FirebaseWebConfig = {
   storageBucket: string;
 };
 
-const FIREBASE: Record<Exclude<AppEnv, "demo">, FirebaseWebConfig> = {
+const FIREBASE: Record<"dev" | "prod", FirebaseWebConfig> = {
   dev: {
     apiKey: "AIzaSyA9uHAnMtlqTZ013E_jUQC3gTitI6jO1fc",
     appId: "1:150892806433:web:9a4a1fab3ed127b4dc7e60",
@@ -35,7 +36,14 @@ const FIREBASE: Record<Exclude<AppEnv, "demo">, FirebaseWebConfig> = {
   },
 };
 
-export const firebaseConfig: FirebaseWebConfig | null = ENV === "demo" ? null : FIREBASE[ENV];
+export const firebaseConfig: FirebaseWebConfig | null = ENV === "demo" ? null : FIREBASE[ENV === "prod" ? "prod" : "dev"];
+
+// The marker shown on every screen of anything that isn't production (null in production).
+export const ENV_TAG: { text: string; label: string } | null =
+  ENV === "prod" ? null
+  : ENV === "demo" ? { text: "PRACTICE", label: "Practice mode" }
+  : ENV === "beta" ? { text: "BETA", label: "Beta version" }
+  : { text: "DEV", label: "Development version" };
 
 // The id the original single-patient version used. Existing data under it is picked up automatically.
 export const PATIENT_ID = "garth";
