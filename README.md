@@ -137,12 +137,12 @@ npm run deploy:rules dev    # by hand; or `prod`
 ```
 
 `.github/workflows/firestore.yml` runs the tests on any push or pull request that touches the rules, then deploys
-pushes to `beta` → `dev` and pushes to `main` → `prod`. It needs, once:
-
-1. In Google Cloud (each Firebase project): a service account with the **Firebase Rules Admin** and **Cloud
-   Datastore Index Admin** roles (or **Firebase Admin**); download a JSON key.
-2. In GitHub → Settings → Environments: create `dev` and `prod`, and add each key as the secret
-   `FIREBASE_SERVICE_ACCOUNT`. Add yourself as a required reviewer on `prod` if prod deploys should wait for you.
+pushes to `beta` → `dev` and pushes to `main` → `prod`. It signs in **keylessly** (Workload Identity Federation):
+GitHub's OIDC token is exchanged for a `github-rules-deploy` service account in that project, which only has
+Firebase Rules Admin, Cloud Datastore Index Admin and Service Usage Consumer. Each project's pool trusts only
+`joshuapointer/observe-now`, and only jobs in the matching GitHub environment, so a dev job can't touch prod. There
+are no keys or secrets; the GitHub environments `dev` and `prod` just hold two variables, `WIF_PROVIDER` and
+`DEPLOY_SA`. To gate prod deploys, add yourself as a required reviewer on the `prod` environment.
 
 Use the repo's Firebase CLI (`npx firebase …`, installed as a dev dependency) rather than a global one.
 
