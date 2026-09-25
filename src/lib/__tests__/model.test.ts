@@ -98,3 +98,20 @@ describe("trends", () => {
     expect(stats[2].value).toBe("0h 30m");
   });
 });
+
+describe("joinPhrases", () => {
+  it("merges phrases that share a word instead of repeating it", () => {
+    expect(M.joinPhrases(["Awake and calm", "Calm and occupied"])).toBe("Awake, calm and occupied");
+  });
+  it("leaves unrelated phrases exactly as written", () => {
+    expect(M.joinPhrases(["Sleeping", "Believing something untrue"])).toBe("Sleeping, Believing something untrue");
+    expect(M.joinPhrases(["Refused food, drink and medicine"])).toBe("Refused food, drink and medicine");
+  });
+  it("merges with any earlier phrase that overlaps, whatever order the codes were picked in", () => {
+    expect(M.joinPhrases(["Awake and calm", "Eating", "Calm and occupied"])).toBe("Awake, calm and occupied, Eating");
+  });
+  it("handles one or none", () => {
+    expect(M.joinPhrases(["Sleeping"])).toBe("Sleeping");
+    expect(M.joinPhrases([])).toBe("");
+  });
+});

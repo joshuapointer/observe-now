@@ -1,13 +1,15 @@
 // Every user action from the PWA's `acts` and `forms`, as plain functions the screens call.
+import { getLocales } from "expo-localization";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 
 import { SECTIONS, SYSTEM_CODES, alertKind, FALL_QUESTIONS, type Code } from "@/lib/codes";
 import { kv } from "@/lib/kv";
 import * as M from "@/lib/model";
+import { looksLikeEmail, toE164 } from "@/lib/phone";
 import { pinHash } from "@/lib/pin";
 import type { Caregiver, Entry, Invite } from "@/lib/types";
-import { get, set, useNow, type AppState, type Drafts, type ModalId, type Settings } from "./app";
+import { actingAs, get, set, useNow, type Acting, type AppState, type Drafts, type ModalId, type Settings } from "./app";
 import { ask, clearToast, run, toast } from "./feedback";
 import { PP, dayPath, dropAll, loadPendingInvites, selectPatient, store, sync, uid, viewDay, welcomeKey } from "./session";
 import { compute, type Thread } from "./view";
@@ -361,6 +363,10 @@ export async function endShift() {
   if (!s) return;
   if (!(await ask({ title: `End ${M.firstName(s.name)}'s shift?`, body: "The next caregiver will pick their name to start theirs. Everything recorded is kept.", yes: "Yes, end the shift" }))) return;
   set({ modal: null });
+  closeShift(s);
+}
+
+function closeShift(s: NonNullable<ReturnType<typeof onShift>>) {
   clearWorkInProgress();
   run(store().batch([
     { path: `${PP()}/shiftLog/${s.id}`, data: { endedAt: Date.now() } },
@@ -452,12 +458,24 @@ export function saveDetails(v: { name: string; careSetting: string; onCallPhone:
   toast("Details saved");
 }
 
-export function invite(v: { email: string; name: string; relation: string; detail: string }) {
-  const email = v.email.trim().toLowerCase(), S = get();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast("That doesn't look like an email address. Check it for typos."); return false; }
+const region = () => getLocales()[0]?.regionCode ?? null;
+
+// Filed by whichever the invitee will sign in with: invitesByEmail/{email} or invitesByPhone/{+E.164}.
+export function invite(v: { contact: string; name: string; relation: string; detail: string }) {
+  const S = get(), raw = v.contact.trim();
+  let path: string, shown: string;
+  if (looksLikeEmail(raw)) {
+    const email = raw.toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast("That doesn't look like an email address. Check it for typos."); return false; }
+    path = `invitesByEmail/${email}`; shown = `${email}. They sign up with that email address.`;
+  } else {
+    const phone = toE164(raw, region());
+    if (!phone) { toast("Type their email address, or their mobile number with its country code (like +44 7700 900123)."); return false; }
+    path = `invitesByPhone/${phone}`; shown = `${phone}. They sign in with that mobile number.`;
+  }
   if (!v.name.trim()) { toast("Type their name first."); return false; }
-  run(store().setDoc(`invitesByEmail/${email}/for/${S.pid}`, { role: "family", digestOnly: false, name: v.name.trim(), relation: v.relation.trim(), detail: v.detail.trim(), patientName: S.patient?.name || "", invitedBy: uid(), at: Date.now() }, false));
-  toast(`Invited ${email}. They sign up with that email address.`);
+  run(store().setDoc(`${path}/for/${S.pid}`, { role: "family", digestOnly: false, name: v.name.trim(), relation: v.relation.trim(), detail: v.detail.trim(), patientName: S.patient?.name || "", invitedBy: uid(), at: Date.now() }, false));
+  toast(`Invited ${shown}`);
   return true;
 }
 
@@ -492,23 +510,30 @@ export function openThread(id: string | "new" | null) {
   if (id && id !== "new") markThreadRead(id);
 }
 
+// Who a message is from: the caregiver on shift in caregiver mode, this family member in family mode.
+function messageFrom(): Record<string, unknown> | null {
+  const S = get();
+  if (actingAs(S) === "family") return S.member ? { who: M.firstName(S.member.name), relation: S.member.relation || "", role: "family" } : null;
+  const s = onShift();
+  return s ? { who: M.firstName(s.name), role: "caregiver", cid: s.cid } : null;
+}
 export function sendReply() {
-  const text = (get().drafts.reply || "").trim(), s = onShift(), tid = openThreadId();
+  const text = (get().drafts.reply || "").trim(), from = messageFrom(), tid = openThreadId();
   const t = tid ? V().threads.find(x => x.root.id === tid) : null;
-  if (!text || !s || !t) return;
+  if (!text || !from || !t) return;
   clearDrafts("reply");
-  sendMessage(t.root.sid, { who: M.firstName(s.name), role: "caregiver", cid: s.cid, text, parentId: t.root.id });
+  sendMessage(t.root.sid, { ...from, text, parentId: t.root.id });
   markThreadRead(t.root.id);
 }
 export function sendNew() {
-  const text = (get().drafts.newmsg || "").trim(), s = onShift();
-  if (!text || !s) return;
+  const text = (get().drafts.newmsg || "").trim(), from = messageFrom();
+  if (!text || !from) return;
   clearDrafts("newmsg");
-  // Always today's log, even while looking at yesterday, so family see it at the top of their list.
-  const id = sendMessage(M.sidAt(Date.now()), { who: M.firstName(s.name), role: "caregiver", cid: s.cid, text });
+  // Always today's log, even while looking at yesterday, so it's at the top of everyone's list.
+  const id = sendMessage(M.sidAt(Date.now()), { ...from, text });
   set({ thread: id });
   markThreadRead(id); // a no-op until its snapshot arrives; the Messages screen marks it again then
-  toast("Sent to family");
+  toast(from.role === "family" ? "Sent" : "Sent to family");
 }
 export const replyTo = (id: string | null) => set({ replyTo: id });
 export function sendFamilyNote() {
@@ -522,7 +547,12 @@ export function sendFamilyNote() {
 }
 
 // ---- auth ----
-const authMessage = (e: { code?: string }) => ({
+// In development, log what Firebase actually said: several of its codes share one friendly message here.
+const authMessage = (e: { code?: string; message?: string }) => {
+  if (__DEV__) console.warn("[auth]", e?.code, e?.message);
+  return authMessages[e?.code || ""] || "Something went wrong. Please try again.";
+};
+const authMessages: Record<string, string> = {
   "auth/invalid-credential": "That email and password don't match. Check them and try again.",
   "auth/wrong-password": "That email and password don't match. Check them and try again.",
   "auth/user-not-found": "That email and password don't match. Check them and try again.",
@@ -532,9 +562,43 @@ const authMessage = (e: { code?: string }) => ({
   "auth/missing-password": "Type your password first.",
   "auth/network-request-failed": "There's no internet connection right now. Try again when you're back online.",
   "auth/too-many-requests": "Too many tries. Please wait a minute, then try again.",
-} as Record<string, string>)[e?.code || ""] || "Something went wrong. Please try again.";
+  "auth/invalid-phone-number": "That doesn't look like a mobile number. Include the country code, like +44 7700 900123.",
+  "auth/missing-phone-number": "Type your mobile number first.",
+  "auth/quota-exceeded": "We can't send more text codes right now. Please try again later, or sign in with email.",
+  "auth/invalid-verification-code": "That code isn't right. Check the text and try again.",
+  "auth/missing-verification-code": "Type the 6-digit code from the text first.",
+  "auth/session-expired": "That code has expired. Send a new one.",
+  "auth/code-expired": "That code has expired. Send a new one.",
+  "auth/missing-verification-id": "Send yourself a code first.",
+  "auth/account-exists-with-different-credential": "There's already an account with that email address. Sign in with your email and password instead.",
+  "auth/operation-not-allowed": "That way of signing in isn't switched on yet. Use email and password for now.",
+};
 
 export const toggleAuthMode = () => set({ authMode: get().authMode === "signup" ? "signin" : "signup", authError: "" });
+export const setAuthMethod = (authMethod: "email" | "phone") => set({ authMethod, phoneSentTo: "", authError: "" });
+
+// Phone sign-in: one step for new and returning people alike. Firebase creates the account on first sign-in.
+export async function sendPhoneCode(input: string) {
+  const phone = toE164(input, region());
+  if (!phone) return set({ authError: authMessage({ code: input.trim() ? "auth/invalid-phone-number" : "auth/missing-phone-number" }) });
+  set({ authBusy: true, authError: "" });
+  try { await store().sendPhoneCode(phone); set({ phoneSentTo: phone }); } catch (e) { set({ authError: authMessage(e as { code?: string }) }); }
+  set({ authBusy: false });
+}
+export async function confirmPhoneCode(code: string) {
+  if (!/^\d{6}$/.test(code.trim())) return set({ authError: authMessage({ code: "auth/missing-verification-code" }) });
+  set({ authBusy: true, authError: "" });
+  try { await store().confirmPhoneCode(code.trim()); set({ phoneSentTo: "" }); } catch (e) { set({ authError: authMessage(e as { code?: string }) }); }
+  set({ authBusy: false });
+}
+export async function signInWithApple() {
+  set({ authBusy: true, authError: "" });
+  try { await store().signInWithApple(); } catch (e) {
+    // Closing the Apple sheet isn't an error worth showing.
+    if ((e as { code?: string })?.code !== "ERR_REQUEST_CANCELED") set({ authError: authMessage(e as { code?: string }) });
+  }
+  set({ authBusy: false });
+}
 
 export async function submitAuth(email: string, password: string) {
   set({ authBusy: true, authError: "" });
@@ -553,14 +617,14 @@ export async function resendVerification() {
 export async function refreshVerification() {
   try {
     const user = await store().refreshUser();
-    set({ user, authError: user?.emailVerified ? "" : "That didn't work yet. Open the email, tap the link, then try again." });
+    set({ user, authError: user?.verified ? "" : "That didn't work yet. Open the email, tap the link, then try again." });
     sync();
   } catch (e) { set({ authError: authMessage(e as { code?: string }) }); }
 }
 export const demoSignIn = (role: "caregiver" | "family") => store().signIn(role);
 
 export async function signOut() {
-  if (isCaregiver() && !(await ask({ title: "Sign this device out?", body: "Someone will need the account's email and password to sign it back in. To hand over to the next caregiver, use End shift instead.", yes: "Yes, sign out", destructive: true }))) return;
+  if (isCaregiver() && !(await ask({ title: "Sign this device out?", body: "Someone will need the account's sign-in details (email and password, Apple ID, or its phone for a texted code) to sign it back in. To hand over to the next caregiver, use End shift instead.", yes: "Yes, sign out", destructive: true }))) return;
   clearTimeout(fallTimer);
   const S = get();
   if (S.pid && S.user) kv.del(draftsKey(S.user.uid, S.pid)); // nothing half-typed stays on a shared device
@@ -575,7 +639,7 @@ export async function acceptInvite(id: string) {
   if (!i) return;
   try {
     await store().batch([
-      { path: `patients/${i.id}/members/${uid()}`, data: { role: i.role, name: i.name, relation: i.relation || "", detail: i.detail || "", digestOnly: !!i.digestOnly }, merge: false },
+      { path: `patients/${i.id}/members/${uid()}`, data: { role: i.role, name: i.name, relation: i.relation || "", detail: i.detail || "", digestOnly: !!i.digestOnly, family: i.role === "family" }, merge: false },
       { path: `users/${uid()}/patients/${i.id}`, data: { name: i.patientName || "Patient", role: i.role, at: Date.now() }, merge: false },
     ]);
     set({ pendingInvites: (get().pendingInvites || []).filter(x => x.id !== i.id) });
@@ -583,8 +647,40 @@ export async function acceptInvite(id: string) {
   } catch (e) { console.error(e); toast("That invitation didn't work. Ask for a new one."); }
 }
 export const openPatient = (id: string) => selectPatient(id);
-export function openPicker() { set({ pickerOpen: true, modal: null }); loadPendingInvites(); }
-export const closePicker = () => set({ pickerOpen: false, addingPatient: false });
+// forMode narrows the list to the people you can open that way (family: the ones you were invited to).
+export function openPicker(forMode: Acting | null = null) { set({ pickerOpen: true, pickerFor: forMode, modal: null }); loadPendingInvites(); }
+export function startAddPatient() { set({ pickerOpen: true, pickerFor: null, addingPatient: true, modal: null }); loadPendingInvites(); }
+export const closePicker = () => set({ pickerOpen: false, pickerFor: null, addingPatient: false });
+
+// Switch between caregiver and family mode for the open person (only offered to the caregiver role). Kept per
+// device and person, so a shared care device and someone's own phone can differ.
+export async function setViewAs(viewAs: Acting) {
+  const S = get();
+  if (!S.pid || S.member?.role !== "caregiver") return;
+  // Someone who joined as family starts their own shift in caregiver mode, so whatever they record carries their
+  // name. Whoever is on shift now (usually the care device's caregiver) has to come off it first.
+  const s = onShift();
+  if (viewAs === "care" && S.member.family && s) {
+    const who = M.firstName(s.name), name = S.patient?.name || "them";
+    if (!(await ask({
+      title: `End ${who}'s shift?`,
+      body: `${who} is on shift for ${name} now. In caregiver mode you start your own shift, so everything you record is under your name, which means ${who}'s shift ends. Everything recorded so far is kept.`,
+      yes: `End ${who}'s shift`,
+      no: "Not now",
+    }))) return;
+    closeShift(s);
+  }
+  kv.set(`gl:view:${uid()}:${S.pid}`, viewAs);
+  set({ viewAs, modal: null });
+  sync();
+}
+
+// The owner lets a family member also act as a caregiver for this person, or takes that back. They stay family.
+export function setCanCare(memberId: string, on: boolean) {
+  const S = get();
+  if (!S.pid || S.patient?.ownerUid !== uid()) return;
+  run(store().setDoc(`${PP()}/members/${memberId}`, { role: on ? "caregiver" : "family", family: true }));
+}
 export const toggleAddPerson = () => set({ addingPatient: !get().addingPatient });
 
 export async function addPatient(nameIn: string) {

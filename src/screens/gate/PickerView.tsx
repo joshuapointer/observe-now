@@ -12,7 +12,10 @@ import { ErrorText, GateLayout, LinkButton, PersonButton } from "./parts";
 
 export function PickerView() {
   const t = useTheme();
-  const links = useApp(s => s.links) || [];
+  const allLinks = useApp(s => s.links) || [];
+  const pickerFor = useApp(s => s.pickerFor);
+  // Opened from family mode: only the people you were invited to follow. From caregiver mode: the ones you care for.
+  const links = pickerFor ? allLinks.filter(l => (l.role === "family") === (pickerFor === "family")) : allLinks;
   const pendingInvites = useApp(s => s.pendingInvites);
   const pid = useApp(s => s.pid);
   const addingPatient = useApp(s => s.addingPatient);
@@ -21,11 +24,16 @@ export function PickerView() {
 
   if (!links.length && pendingInvites === undefined) return <LoadingView />;
 
-  const invites = (pendingInvites || []).filter(i => !links.some(l => l.id === i.id));
-  const first = !links.length && !invites.length;
-  const showForm = first || addingPatient;
-  const title = links.length ? "Who are you caring for?" : invites.length ? "You've been invited" : "Let's get started";
-  const cur = links.find(l => l.id === pid);
+  const invites = (pendingInvites || []).filter(i => !allLinks.some(l => l.id === i.id));
+  // Family mode only ever offers the people you were invited to (and invitations waiting); adding someone to care
+  // for belongs to caregiver mode.
+  const familyOnly = pickerFor === "family";
+  const first = !familyOnly && !allLinks.length && !invites.length;
+  const showForm = !familyOnly && (first || addingPatient);
+  const title = links.length
+    ? pickerFor === "family" ? "Who are you following?" : "Who are you caring for?"
+    : invites.length ? "You've been invited" : "Let's get started";
+  const cur = allLinks.find(l => l.id === pid);
   const submit = () => { addPatient(name); setName(""); };
 
   return (
@@ -63,8 +71,8 @@ export function PickerView() {
       {first ? (
         <T color={t.c.mute}>
           This account isn&apos;t on anyone&apos;s log yet. Family: if someone invited you, make sure you signed in with
-          the email address they used and the invitation will appear here. Setting up the care iPad? Add the
-          person being cared for:
+          the email address or mobile number they used and the invitation will appear here. Setting up for
+          caregivers? Add the person being cared for:
         </T>
       ) : null}
       {showForm ? (
@@ -81,7 +89,7 @@ export function PickerView() {
           />
           <Button kind="primary" big title="Add this person" onPress={submit} />
         </View>
-      ) : (
+      ) : familyOnly ? null : (
         <Button big title="Add another person" onPress={toggleAddPerson} />
       )}
       <ErrorText>{authError}</ErrorText>

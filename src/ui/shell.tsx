@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ENV_TAG } from "@/lib/config";
 import * as M from "@/lib/model";
 import { endShift, openModal, undo, viewToday, viewYesterday } from "@/state/actions";
-import { useApp } from "@/state/app";
+import { actingAs, useApp } from "@/state/app";
 import { useView } from "@/state/view";
 import { useLayout } from "./layout";
 import { useTheme } from "./theme";
@@ -32,22 +32,26 @@ function ChromeButton({ title, onPress, icon, label }: { title?: string; onPress
 // The coloured bar at the top: who's live, sync state, shift, help.
 export function StatusHeader({ right }: { right?: ReactNode }) {
   const t = useTheme(), insets = useSafeAreaInsets(), V = useView(), { isTablet } = useLayout();
-  const status = useApp(s => s.status), isFamily = useApp(s => s.member?.role === "family");
+  const status = useApp(s => s.status), isFamily = useApp(s => actingAs(s) === "family");
   const offline = !status.online;
+  // Family see who's looking after them and whether the care app is open; caregivers see whether family are.
+  const cg = V.onShift ? M.firstName(V.onShift.name) : "";
   const left = offline
     ? `No internet — ${isFamily ? "showing the last update" : "entries will send when it's back. Keep the app open until then"}`
     : isFamily
-      ? `Live from ${V.ctx.caregiver}`
+      ? cg
+        ? `${cg} is on shift · ${V.careActive ? "active now" : V.careSeen ? `last active ${M.agoText(V.careSeen, V.now)}` : "not active yet"}`
+        : "No one on shift right now"
       : V.live.length ? `${V.live.length} family watching` : "No family watching";
+  const liveDot = isFamily ? !!cg && V.careActive : V.live.length > 0;
   return (
     <View style={{ backgroundColor: t.c.chrome, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right }}>
       <View style={styles.statusRow}>
         <EnvBadge />
         <View style={[styles.pill, { backgroundColor: offline ? t.c.danger : "rgba(255,255,255,0.14)", borderRadius: t.colorful ? 999 : 0, flexShrink: 1 }]}>
-          {offline ? null : <View style={[styles.dot, { backgroundColor: t.c.live }]} />}
+          {offline ? null : <View style={[styles.dot, { backgroundColor: liveDot ? t.c.live : t.c.onChromeDim }]} />}
           <Text maxFontSizeMultiplier={1.3} numberOfLines={isTablet ? 1 : 2} style={[t.font("bold"), { color: "#fff", fontSize: 13, flexShrink: 1 }]}>{left}</Text>
         </View>
-        {isTablet ? <Text style={[t.font("bold"), { color: t.c.onChromeDim, fontSize: 13 }]}>{M.dayLong(V.now)}</Text> : null}
         {!offline && !isFamily && status.pending ? <Text style={[t.font("bold"), { color: t.c.onChromeDim, fontSize: 13 }]}>Saving…</Text> : null}
         <View style={{ flex: 1 }} />
         {right}
@@ -115,7 +119,7 @@ export function FamilyHeader() {
 export function Toast() {
   const t = useTheme(), insets = useSafeAreaInsets();
   const msg = useApp(s => s.toast), canUndo = useApp(s => !!s.undo);
-  const inTabs = useApp(s => s.member?.role === "caregiver" && !!s.patient?.onShift && !s.pickerOpen);
+  const inTabs = useApp(s => actingAs(s) === "care" && !!s.patient?.onShift && !s.pickerOpen);
   if (!msg) return null;
   return (
     <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { justifyContent: "flex-end", alignItems: "center", paddingBottom: insets.bottom + (inTabs ? 64 : 16) }]}>

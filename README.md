@@ -1,30 +1,35 @@
 # Observe Now
 
-15-minute behaviour observation, shared live with family — the Garth Log PWA
-(`~/Developer/garth-observation`) rebuilt as a React Native app for **iPhone, iPad and Android phones**.
+15-minute behaviour observation, shared live with family, for **iPhone, iPad and Android** phones and tablets.
+Every role works on every device: caregivers can use a phone or a tablet, and so can family.
 
-It talks to the **same Firebase projects** as the PWA, with the same Firestore data model, so the two work side
-by side: the care iPad can run the app while family keep using the web version, or the other way round.
-Nothing about the backend (rules, indexes, hosting) lives here — that stays in `garth-observation`.
+It replaces the Garth Log PWA (`garth-observation`), which is **retired**. The app uses the same Firebase projects
+and Firestore data model, so existing logs, accounts and caregiver PINs carry over. This repo is the whole
+product now, backend included: the Firestore rules and indexes live in `firebase/`.
 
-Built with Expo SDK 57, expo-router, TypeScript, the Firebase JS SDK and zustand.
+Built with Expo SDK 57, expo-router, TypeScript, React Native Firebase (the native SDKs) and zustand.
 
 ## Run it
 
 ```sh
 npm install
-npm run demo      # practice mode: local data only, never touches Firebase
-npm start         # the dev Firebase project (garth-log-dev)
+npm run demo      # practice mode in Expo Go: local data only, never touches Firebase
+npm run ios       # build + install the dev app (Observe Now Dev) on a simulator, then start Metro
+npm start         # Metro for an already-installed dev app (garth-log-dev)
 ```
 
-Then press `i` for the iOS Simulator, `a` for an Android emulator, or run it on a real phone/iPad: install
-**Expo Go**, join the same Wi-Fi as the Mac, and scan the QR code Metro prints with the Camera app (or type the
-`exp://<mac-ip>:8081` URL into Expo Go). Saving a file reloads every connected device. `mise run demo` /
-`mise run start` do the same. Signed in to Expo Go with the account that ran `npx expo login`, the server also
-shows up in Expo Go's list, no QR needed. After switching environment, restart Metro with `--clear` so the new
-value is inlined.
+**Practice mode runs in Expo Go.** Install Expo Go on a phone/iPad on the same Wi-Fi as the Mac and scan the QR
+code Metro prints (or type the `exp://<mac-ip>:8081` URL into Expo Go); saving a file reloads every connected
+device. Signed in to Expo Go with the account that ran `npx expo login`, the server also shows up in its list.
 
-**Practice mode** has the same seed data as the PWA's demo: sign in as *the care iPad* or as *Ellen (family)*;
+**The real backend needs the dev app, not Expo Go**, because Firebase is native code Expo Go doesn't include.
+Build it once per device — `npm run ios` for a simulator (needs Xcode and CocoaPods), or
+`npx eas-cli@latest build -p ios --profile dev` for a registered phone/iPad — then `npm start` and open it; it
+reloads like Expo Go does. Rebuild only after adding a native package or changing `app.json`/`app.config.ts`.
+The dev app needs `firebase/dev/GoogleService-Info.plist` (see below). After switching environment, restart
+Metro with `--clear` so the new value is inlined.
+
+**Practice mode** has the same seed data as the PWA's demo: sign in as *the care device* or as *Ellen (family)*;
 caregivers are Dana R. and Sam K., and both PINs are **1234**. A red "PRACTICE", "DEV" or "BETA" tag shows on every
 screen of anything that isn't production.
 
@@ -32,10 +37,10 @@ screen of anything that isn't production.
 
 | `EXPO_PUBLIC_APP_ENV` | Backend | Run locally |
 | --- | --- | --- |
-| `dev` (default) | `garth-log-dev` | `npm start` |
-| `beta` | `garth-log-dev` (the TestFlight app) | `EXPO_PUBLIC_APP_ENV=beta npx expo start` |
-| `prod` | `behavior-observation-2d03f` — real people's data | `EXPO_PUBLIC_APP_ENV=prod npx expo start` |
-| `demo` | none (on-device practice store) | `npm run demo` |
+| `dev` (default) | `garth-log-dev` | `npm start` (dev app) |
+| `beta` | `garth-log-dev` (the TestFlight app) | TestFlight build |
+| `prod` | `behavior-observation-2d03f` — real people's data | App Store build |
+| `demo` | none (on-device practice store) | `npm run demo` (Expo Go) |
 
 The same variable picks the app identity in `app.config.ts`, so each environment is its own installable app and
 only "Observe Now" can reach prod:
@@ -46,8 +51,43 @@ only "Observe Now" can reach prod:
 | `beta` | Observe Now Beta | `com.joshpointer.observenow.beta` | `garth-log-dev` | TestFlight |
 | `production` | Observe Now | `com.joshpointer.observenow` | `behavior-observation-2d03f` | App Store |
 
-The Firebase web configs in `src/lib/config.ts` are the public web-app configs Firebase Hosting serves at
-`/__/firebase/init.json`; they are not secrets. Dev is the default so a stray build can never write to prod.
+Which Firebase project a build talks to comes from the `GoogleService-Info.plist` that `app.config.ts` bundles
+from `firebase/<dev|beta|prod>/` — see [`firebase/README.md`](firebase/README.md). They aren't secrets and are
+committed. Dev is the default so a stray build can never write to prod.
+
+### Signing in
+
+Three ways, all Firebase Auth. The sign-in screen opens on the mobile number, with Sign in with Apple below it
+and "Use email instead" for email and password.
+
+- **Email and password**, with the emailed verification link (as in the PWA).
+- **Sign in with Apple** (iOS): `expo-apple-authentication` → Firebase `apple.com` credential. Apple accounts
+  arrive with a verified email; "Hide My Email" gives a `privaterelay.appleid.com` address, so invite those people
+  by that address or by phone.
+- **Mobile number + texted 6-digit code**: Firebase phone auth. New and returning people use the same two steps.
+  Numbers are stored as E.164 (`+14155550123`); a 10-digit number is read as +1 on a US/Canadian device.
+  On a **simulator** the dev app skips app verification, so only the console's test numbers work there (no web
+  page, no real SMS); real devices and release builds always verify.
+
+Family can be invited by email *or* mobile number (`invitesByEmail/{email}` / `invitesByPhone/{+E.164}`), and
+the Firestore rules treat a phone-number account as verified.
+
+**Firebase / Apple setup each backend needs** (both projects unless noted):
+
+1. **Blaze plan** — phone auth bills per SMS.
+2. Authentication → Sign-in method: enable **Phone** and **Apple**. Add test numbers under Phone for development.
+3. Project settings → add the iOS apps (`.dev` and `.beta` in `garth-log-dev`, `com.joshpointer.observenow` in
+   prod) and put each `GoogleService-Info.plist` in `firebase/<env>/`.
+4. Upload an **APNs auth key** (Apple Developer → Keys; environment *Sandbox & Production*) under Project
+   settings → Cloud Messaging → Apple app configuration, **once per iOS app** — each bundle id has its own slot
+   (`.dev` and `.beta` in `garth-log-dev`, the prod app in `behavior-observation-2d03f`). A missing one doesn't
+   error: that app just always gets the reCAPTCHA page. With it, phone sign-in on a real device proves it's the real app with a silent push — no web page;
+   the app carries the push entitlement and `remote-notification` background mode for this (`app.json`). If no
+   push arrives, Firebase falls back to a reCAPTCHA page, which returns to the app on a `…://firebaseauth/…` link
+   that `src/app/+native-intent.tsx` keeps away from the router.
+5. Authentication → Settings → **SMS region policy**: allow every country your people use. New projects allow
+   none, which fails even for test numbers ("SMS unable to be sent until this region enabled").
+6. Deploy the rules (see *Firestore rules* below).
 
 ## Branches and releases
 
@@ -56,7 +96,7 @@ Code lives at `github.com/joshuapointer/observe-now`; the EAS project is
 
 | Branch | Push does |
 | --- | --- |
-| `dev` | nothing — day-to-day work, test with Expo Go |
+| `dev` | nothing — day-to-day work, test in Expo Go (practice) or the dev app |
 | `beta` | builds Observe Now Beta and uploads it to **TestFlight** (`.eas/workflows/beta.yml`) |
 | `main` | builds Observe Now and uploads it to **App Store Connect** (`.eas/workflows/production.yml`); it lands in TestFlight, and going live is a manual "Submit for Review" there |
 
@@ -79,19 +119,41 @@ normal terminal (needs a paid Apple Developer account):
 3. The same with `--profile production` (or just `npx eas-cli@latest credentials -p ios` → `production` to set up
    signing and the API key without shipping a build).
 4. On expo.dev: project → **Settings → GitHub**, install the Expo GitHub app and pick `joshuapointer/observe-now`.
-5. Optional, for `dev` builds on your own devices: `npx eas-cli@latest device:create`, then
-   `npx eas-cli@latest build -p ios --profile dev`.
+5. For the dev app on your own devices: `npx eas-cli@latest device:create`, then
+   `npx eas-cli@latest build -p ios --profile dev` (a development build: it loads JS from Metro).
 
 If a workflow's submit step asks for `ascAppId`, add each app's Apple ID (App Store Connect → App Information) to
 the matching `submit` profile in `eas.json` as `"ios": { "ascAppId": "…" }`.
+
+## Firestore rules
+
+`firebase/firestore.rules` and `firebase/firestore.indexes.json` are the one copy of the backend rules. Only this
+app uses them now (the PWA is retired). `.firebaserc` names the projects: `dev` is `garth-log-dev` (the dev and
+beta apps), `prod` is `behavior-observation-2d03f`.
+
+```sh
+npm run test:rules          # emulator tests (Java 21 comes from mise.toml)
+npm run deploy:rules dev    # by hand; or `prod`
+```
+
+`.github/workflows/firestore.yml` runs the tests on any push or pull request that touches the rules, then deploys
+pushes to `beta` → `dev` and pushes to `main` → `prod`. It needs, once:
+
+1. In Google Cloud (each Firebase project): a service account with the **Firebase Rules Admin** and **Cloud
+   Datastore Index Admin** roles (or **Firebase Admin**); download a JSON key.
+2. In GitHub → Settings → Environments: create `dev` and `prod`, and add each key as the secret
+   `FIREBASE_SERVICE_ACCOUNT`. Add yourself as a required reviewer on `prod` if prod deploys should wait for you.
+
+Use the repo's Firebase CLI (`npx firebase …`, installed as a dev dependency) rather than a global one.
 
 ## Checks
 
 ```sh
 npm run typecheck
 npm run lint
-npm test          # model, codes, and PIN-hash parity with the PWA
-mise run check    # all three
+npm test          # model, codes, phone numbers, and PIN-hash parity with the PWA
+npm run test:rules  # Firestore security rules, in the emulator
+mise run check    # typecheck, lint, test
 ```
 
 End-to-end, in the iOS Simulator with [Maestro](https://maestro.mobile.dev) (`mise use maestro`, needs Java):
@@ -120,9 +182,14 @@ src/screens/        the screens
   change is that a patient's code list is passed around as a value (`ctx.reg`) instead of a global.
 - `src/state/actions.ts` holds every action from the PWA's `acts`/`forms`, with the same Firestore paths and
   fields. `src/state/session.ts` is the PWA's `sync()`.
-- **iPad** (≥ 768 pt wide) gets the PWA's two-pane layouts; **phones** get one column and a bottom tab bar.
-- Shift PINs hash exactly like the PWA (`SHA-256("garthlog-pin:{cid}:{pin}")`), so a PIN set in either app works
-  in both. There's a test for it.
+- **Tablets** (≥ 768 pt wide, iPad or Android) get two-pane layouts; **phones** get one column and a bottom tab
+  bar. Layout follows the screen, never the role.
+- **Caregivers share one care account per person being cared for**, signed in on as many phones or tablets as
+  they use; each caregiver starts their shift by picking their name and PIN. Who's on shift lives on the patient
+  record, so every care device shows the same shift and log, and ending it on one ends it everywhere. Family sign
+  in with their own accounts on their own devices.
+- Shift PINs hash exactly like the PWA did (`SHA-256("garthlog-pin:{cid}:{pin}")`), so PINs set in the PWA keep
+  working. There's a test for it; don't change the scheme without migrating stored PINs.
 
 ## Differences from the PWA
 
@@ -133,20 +200,20 @@ src/screens/        the screens
 
 ## Not done / known limits
 
-- **No push notifications**, same as the PWA: alerts and new-message toasts only show while the app is open.
-  Native push would need Cloud Functions plus native Firebase config (`GoogleService-Info.plist` /
-  `google-services.json`) and a development build.
-- **Offline**: the Firebase JS SDK on React Native only has a memory cache. Entries made offline are queued and
-  sent when the connection returns *as long as the app stays open*; the PWA's IndexedDB cache survived a
-  restart. The app guards against the one dangerous case (an offline cold start mistaking "no cached data"
-  for "you've lost access") by only acting on server answers.
+- **No push notifications**, same as the PWA: alerts and new-message toasts only show while the app is open. The
+  app now uses the native Firebase SDK, so adding `@react-native-firebase/messaging` plus a Cloud Function that
+  sends on new alerts/messages is the remaining work.
+- **Offline**: the native Firestore SDK keeps a persistent on-disk cache, so entries made offline survive the app
+  closing and are sent when the connection returns. The app still only acts on server answers for the one
+  dangerous case (an offline cold start mistaking "no data" for "you've lost access").
+- **Phone and Apple sign-in haven't run against a real Firebase project yet** — they need the console setup in
+  *Signing in* above. The Firestore rules for them were tested in the emulator (phone, Apple, verified and
+  unverified email accounts, both invite kinds).
 - **No store build has been made yet** — the EAS project, profiles and workflows exist, but the one-time setup
   above hasn't been run.
-- **Before a production build**, the prod Firebase web API key may be locked to the PWA's website (HTTP
-  referrers). React Native sends no referrer, so give the app its own key restricted to Identity Toolkit,
-  Token Service and Firestore instead of loosening the PWA's. (The dev key was checked: sign-in reaches it.)
-- **Android was never run** — there's no Android SDK on the machine this was built on. Both platform bundles
-  compile, and the Android-specific spots (modal insets, keyboard, edge-to-edge) were reviewed, but test the
-  note field, message composer and modals on an emulator before relying on it.
-- **Tested** on iPhone 17 and iPad Pro 13" simulators in practice mode (full caregiver and family flows), and
-  against `garth-log-dev` for sign-in. Not tested with a real signed-in Firebase account end to end.
+- **Web** only runs practice mode now; the real backend needs the native SDK.
+- **Android was never run** — there's no Android SDK on the machine this was built on. It also needs each
+  environment's `google-services.json` in `firebase/<env>/`. The Android-specific spots (modal insets, keyboard,
+  edge-to-edge) were reviewed, but test the note field, message composer and modals on an emulator before relying
+  on it.
+- **Tested** on iPhone 17 and iPad Pro 13" simulators in practice mode (full caregiver and family flows).

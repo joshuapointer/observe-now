@@ -30,6 +30,8 @@ export type AppState = {
   authReady: boolean;
   user: User | null;
   authMode: "signin" | "signup";
+  authMethod: "email" | "phone";
+  phoneSentTo: string; // E.164 number the last text code went to; "" until one is sent
   authError: string;
   authBusy: boolean;
 
@@ -38,7 +40,9 @@ export type AppState = {
   pendingInvites: Invite[] | undefined;
   legacyChecked: boolean;
   pickerOpen: boolean;
+  pickerFor: Acting | null; // the picker lists only the people you can open this way; null lists everyone
   addingPatient: boolean;
+  viewAs: Acting | null; // this device's chosen mode for the open person (see actingAs); null = the default
 
   member: Member | null | undefined;
   patient: Patient | null | undefined;
@@ -87,7 +91,7 @@ export type AppState = {
 const DEFAULT_SETTINGS: Settings = { plain: true, nudge: true, wake: true, theme: "auto", style: "colorful", clock: "auto" };
 
 export const initialSession = (): Partial<AppState> => ({
-  pid: null, links: undefined, pendingInvites: undefined, legacyChecked: false, pickerOpen: false, addingPatient: false,
+  pid: null, links: undefined, pendingInvites: undefined, legacyChecked: false, pickerOpen: false, pickerFor: null, addingPatient: false, viewAs: null,
   data: {}, member: undefined, patient: undefined, roster: undefined, members: [], presence: [], reg: DEFAULT_REGISTRY,
   pinFor: null, pin: "", pinError: "", cgForm: null, edit: null, codeForm: null, medForm: null, thread: null, replyTo: null,
   pendingCodes: [], target: null, place: "", pain: "—", details: false, openSection: null, msgReadAt: {}, trends: null,
@@ -96,7 +100,7 @@ export const initialSession = (): Partial<AppState> => ({
 
 export const useApp = create<AppState>(() => ({
   ...(initialSession() as AppState),
-  authReady: false, user: null, authMode: "signin", authError: "", authBusy: false,
+  authReady: false, user: null, authMode: "signin", authMethod: "phone", phoneSentTo: "", authError: "", authBusy: false,
   follow: true, sid: M.sidAt(Date.now()),
   drafts: {},
   settings: DEFAULT_SETTINGS,
@@ -113,6 +117,17 @@ export function hydrateApp() {
     settings: { ...DEFAULT_SETTINGS, ...kv.get<Partial<Settings>>("gl:settings", {}) },
     lastVisit: kv.get("gl:lastVisit", 0),
   });
+}
+
+// Role is what an account may do for a person (the security rules enforce it); mode is which side of the app it's
+// using. Family members only ever get family mode. Anyone with the caregiver role can switch between the two;
+// their default is family mode if they joined as family (and the owner granted caregiving), caregiver otherwise.
+export type Acting = "care" | "family";
+export function actingAs(S: Pick<AppState, "member" | "viewAs">): Acting | null {
+  const m = S.member;
+  if (!m) return null;
+  if (m.role !== "caregiver") return "family";
+  return S.viewAs ?? (m.family ? "family" : "care");
 }
 
 export const get = useApp.getState;

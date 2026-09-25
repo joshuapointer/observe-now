@@ -5,8 +5,8 @@ import { buildRegistry } from "@/lib/codes";
 import { kv } from "@/lib/kv";
 import * as M from "@/lib/model";
 import { getStore, type DataStore, type Unsub } from "@/lib/store";
-import type { AlertDoc, Caregiver, Day, DayData, Entry, Link, Member, Message, Patient, Presence, PrivateNote } from "@/lib/types";
-import { get, initialSession, set, useNow } from "./app";
+import type { AlertDoc, Caregiver, Day, DayData, Entry, Invite, Link, Member, Message, Patient, Presence, PrivateNote } from "@/lib/types";
+import { actingAs, get, initialSession, set, useNow } from "./app";
 import { toast, run } from "./feedback";
 
 export const store = (): DataStore => getStore();
@@ -34,13 +34,17 @@ export function sync() {
   const S = get(), st = store();
   const want = new Set<string>();
   const add = (key: string, start: () => Unsub) => { want.add(key); if (!subs.has(key)) subs.set(key, start()); };
-  const ready = S.user && (st.demo || S.user.emailVerified);
+  const ready = S.user && (st.demo || S.user.verified);
   if (ready) {
     // Which people does this user look after? An empty list straight from the cache (offline cold start)
     // isn't an answer yet: it would send them to "Let's get started".
     add("links", () => st.watchCol<Link>(`users/${uid()}/patients`, (l, meta) => {
       if (meta.fromCache && !l.length && get().links === undefined) return;
-      set({ links: l }); onLinks();
+      set({ links: l });
+      // A link this device just wrote (adding a patient, joining one) arrives before the server has the matching
+      // membership. Opening it then would start reads the rules still refuse, and a refused listener never
+      // recovers. The confirmed snapshot follows moments later; act on that one.
+      if (!meta.pending) onLinks();
     }, () => { set({ links: [] }); onLinks(); }));
     if (S.pid) {
       const pid = S.pid, pp = PP();
@@ -75,7 +79,7 @@ export function sync() {
           add(`entries:${pid}:${sid}`, () => st.watchCol<Entry>(`${base}/entries`, l => patchDay(sid, { entries: l.map(e => ({ ...e, sid })) })));
           add(`notes:${pid}:${sid}`, () => st.watchCol<Message>(`${base}/familyNotes`, l => {
             const mapKey = `${pid}:${sid}`, seen = notesSeen.get(mapKey), withSid = l.map(e => ({ ...e, sid }));
-            if (seen) { // new messages from anyone but this login: family on the iPad, caregiver replies on family phones
+            if (seen) { // new messages from anyone but this login: family on the care devices, caregiver replies on family devices
               withSid.filter(n => !seen.has(n.id) && n.uid !== uid()).forEach(n => toast(`💬 ${M.firstName(n.who)}: ${n.text}`.slice(0, 160)));
             }
             notesSeen.set(mapKey, new Set(withSid.map(n => n.id)));
@@ -127,9 +131,15 @@ async function onLinks() {
 
 export async function loadPendingInvites() {
   set({ pendingInvites: [] });
-  const email = get().user?.email;
-  if (!email) return;
-  try { set({ pendingInvites: await store().getCol(`invitesByEmail/${email}/for`) }); } catch { set({ pendingInvites: [] }); }
+  const { email, phone } = get().user || {};
+  // Each lookup fails on its own (rules deny a list for a claim the account doesn't have), so one can't sink the other.
+  const load = (path: string) => store().getCol<Invite>(path).catch(() => [] as Invite[]);
+  const [byEmail, byPhone] = await Promise.all([
+    email ? load(`invitesByEmail/${email}/for`) : [],
+    phone ? load(`invitesByPhone/${phone}/for`) : [],
+  ]);
+  const seen = new Set<string>();
+  set({ pendingInvites: [...byEmail, ...byPhone].filter(i => !seen.has(i.id) && !!seen.add(i.id)) });
 }
 
 export function selectPatient(pid: string | null) {
@@ -141,6 +151,7 @@ export function selectPatient(pid: string | null) {
     place: "", pain: "—", details: false, openSection: null, // half-filled entries belong to the patient they were started for
     pickerOpen: false, addingPatient: false, modal: null, medForm: null, stripCollapsed: false,
     drafts: pid && get().user ? kv.get(`gl:drafts:${get().user!.uid}:${pid}`, {}) : {},
+    viewAs: pid && get().user ? kv.get(`gl:view:${get().user!.uid}:${pid}`, null) : null,
   });
   ensuring.clear();
   if (get().user) {
@@ -161,13 +172,13 @@ function lostAccess() {
 
 export const welcomeKey = () => {
   const S = get();
-  return S.member?.role === "caregiver" ? `gl:welcomed:cg:${S.patient?.onShift?.cid}` : `gl:welcomed:${uid()}`;
+  return actingAs(S) === "care" ? `gl:welcomed:cg:${S.patient?.onShift?.cid}` : `gl:welcomed:${uid()}`;
 };
 
 function onMember() {
   const S = get();
   // One short tour, first time only (caregivers get theirs on their first shift).
-  if (S.member?.role === "family" && !kv.get(welcomeKey(), false) && !S.modal) set({ modal: "welcome" });
+  if (actingAs(S) === "family" && !kv.get(welcomeKey(), false) && !S.modal) set({ modal: "welcome" });
   sync();
   lastBeat = 0;
   beat();
@@ -189,7 +200,7 @@ export function beat() {
   const S = get();
   if (!S.member || !S.pid || RNAppState.currentState !== "active" || Date.now() - lastBeat < 5000) return;
   lastBeat = Date.now();
-  store().setDoc(`${PP()}/presence/${uid()}`, { name: S.patient?.onShift?.name || S.member.name, role: S.member.role, lastSeen: Date.now() }).catch(() => {});
+  store().setDoc(`${PP()}/presence/${uid()}`, { name: actingAs(S) === "care" ? S.patient?.onShift?.name || S.member.name : S.member.name, role: actingAs(S) === "care" ? "caregiver" : "family", lastSeen: Date.now() }).catch(() => {});
 }
 
 // ---- viewing a day ----

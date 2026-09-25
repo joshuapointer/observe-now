@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { DEMO } from "@/lib/config";
 import { firstName } from "@/lib/model";
 import type { Caregiver } from "@/lib/types";
-import { cgNew, pickCaregiver, pinBack, pinCancel, pinKey, signOut } from "@/state/actions";
+import { cgNew, openPicker, pickCaregiver, pinBack, pinCancel, pinKey, setViewAs, signOut } from "@/state/actions";
 import { useApp, type CgForm } from "@/state/app";
 import { Button, T } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
@@ -37,9 +37,26 @@ function RosterScreen({ roster }: { roster: Caregiver[] }) {
         {roster.map(c => <PersonButton key={c.id} name={c.name} onPress={() => pickCaregiver(c.id)} />)}
       </View>
       <Button big title="I'm not on the list" onPress={cgNew} />
+      <FamilyMode />
+      <SwitchPerson />
       <LinkButton title="Sign this device out" onPress={signOut} />
     </GateLayout>
   );
+}
+
+// No shift running: anyone with the caregiver role can look at this person's day the way family do instead.
+function FamilyMode() {
+  const member = useApp(s => s.member);
+  if (member?.role !== "caregiver") return null;
+  return <LinkButton title="See it as family instead" onPress={() => setViewAs("family")} />;
+}
+
+// Back to the list of people this account is linked to, when there's more than one (or an invitation waiting).
+function SwitchPerson() {
+  const links = useApp(s => s.links);
+  const invites = useApp(s => s.pendingInvites);
+  if ((links?.length || 0) < 2 && !invites?.length) return null;
+  return <LinkButton title="Switch to someone else" onPress={() => openPicker(null)} />;
 }
 
 function AddCaregiverScreen({ roster, cgForm }: { roster: Caregiver[]; cgForm: CgForm | null }) {
@@ -55,6 +72,8 @@ function AddCaregiverScreen({ roster, cgForm }: { roster: Caregiver[]; cgForm: C
         </T>
       )}
       <CaregiverForm form={cgForm || { id: null, name: "" }} cancellable={roster.length > 0} />
+      <FamilyMode />
+      <SwitchPerson />
       <LinkButton title="Sign this device out" onPress={signOut} />
     </GateLayout>
   );

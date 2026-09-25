@@ -76,9 +76,33 @@ export const entryCodes = (e: Partial<Entry> | null | undefined): string[] => (e
 
 const painPart = (e: Partial<Entry>) => (e.pain && e.pain !== "—" ? ` Pain ${e.pain} of 10.` : "");
 
+// Several plain-words phrases as one: phrases that share a word merge into a single list, so "Awake and calm" +
+// "Calm and occupied" reads "Awake, calm and occupied" rather than repeating "calm". Unrelated ones stay separate.
+export function joinPhrases(texts: string[]): string {
+  // Each group is either one phrase kept exactly as written, or the parts of phrases merged because they overlap.
+  const groups: { text: string; parts: string[]; merged: boolean }[] = [];
+  const splitAnd = (t: string) => t.split(/\s+and\s+/).map(p => p.trim()).filter(Boolean);
+  const has = (parts: string[], part: string) => parts.some(p => p.toLowerCase() === part.toLowerCase());
+  for (const text of texts) {
+    const parts = splitAnd(text), prev = groups.find(g => parts.some(p => has(g.parts, p)));
+    if (prev) {
+      for (const p of parts) if (!has(prev.parts, p)) prev.parts.push(p.charAt(0).toLowerCase() + p.slice(1));
+      prev.merged = true;
+    } else {
+      groups.push({ text, parts, merged: false });
+    }
+  }
+  const list = (g: string[]) => (g.length > 1 ? `${g.slice(0, -1).join(", ")} and ${g[g.length - 1]}` : g[0] || "");
+  return groups.map(g => (g.merged ? list(g.parts) : g.text)).join(", ");
+}
+
+// Codes as words: plain phrases merged where they overlap; clinical wording is only ever listed.
+export const codesText = (codes: string[], ctx: Ctx, plain = true) =>
+  plain ? joinPhrases(codes.map(c => codeText(c, ctx, true))) : codes.map(c => codeText(c, ctx, false)).join(", ");
+
 export function entryLine(e: Partial<Entry>, ctx: Ctx, plain = true) {
   const codes = entryCodes(e);
-  const base = codes.length ? codes.map(c => codeText(c, ctx, plain)).join(", ") : "";
+  const base = codes.length ? codesText(codes, ctx, plain) : "";
   const note = e.note ? (base ? " — " : "") + e.note : "";
   const text = base + note;
   return text ? text.replace(/[.\s]+$/, "") + "." + painPart(e) : painPart(e).trim();

@@ -20,7 +20,7 @@ export function Pending({ V, t, selected, when, place, pain, note, details, maxD
   const kind = V.pendingAlertKind;
   // Show details for pain codes, or once anything is filled in.
   const open = details || selected.some(c => ["PN", "US"].includes(c)) || pain !== "—" || !!place || !!note;
-  const whatText = selected.map(c => M.codeText(c, ctx, plain)).join(", ");
+  const whatText = M.codesText(selected, ctx, plain);
 
   return (
     <View

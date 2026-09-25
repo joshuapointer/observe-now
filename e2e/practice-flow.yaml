@@ -11,7 +11,7 @@ appId: host.exp.Exponent
     commands:
       - tapOn: "Open"
 - extendedWaitUntil:
-    visible: "Continue|The care iPad.*|Reload"
+    visible: "Continue|The care device.*|Reload"
     timeout: 90000
 - runFlow:
     when:
@@ -27,10 +27,10 @@ appId: host.exp.Exponent
           end: 50%, 98%
       - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible: "The care iPad · caregivers start shifts here"
+    visible: "The care device · caregivers start shifts here"
     timeout: 30000
 - takeScreenshot: 01-auth
-- tapOn: "The care iPad · caregivers start shifts here"
+- tapOn: "The care device · caregivers start shifts here"
 - extendedWaitUntil:
     visible: "Start a shift"
     timeout: 15000

@@ -16,7 +16,7 @@ import * as SystemUI from "expo-system-ui";
 import { useEffect, useMemo, useState } from "react";
 
 import { loadKv } from "@/lib/kv";
-import { hydrateApp, useApp, type AppState } from "@/state/app";
+import { actingAs, hydrateApp, useApp, type AppState } from "@/state/app";
 import { boot } from "@/state/session";
 import { ModalHost } from "@/screens/modals/ModalHost";
 import { EnvTag, Toast } from "@/ui/shell";
@@ -28,7 +28,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 export type Mode = "gate" | "care" | "family";
 export function modeOf(S: AppState): Mode {
   if (!S.authReady || !S.user || S.pickerOpen || !S.pid || !S.member) return "gate";
-  if (S.member.role === "family") return "family";
+  if (actingAs(S) === "family") return "family";
   if (!S.patient || !S.patient.onShift) return "gate";
   return "care";
 }

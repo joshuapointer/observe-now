@@ -11,8 +11,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.joshpointer.observenow",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "entitlements": {
+        "aps-environment": "development"
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.joshpointer.observenow",
@@ -38,7 +43,19 @@
           "backgroundColor": "#201e1d"
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "dynamic",
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

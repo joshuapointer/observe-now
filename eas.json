@@ -4,6 +4,7 @@
   },
   "build": {
     "dev": {
+      "developmentClient": true,
       "distribution": "internal",
       "autoIncrement": true,
       "env": {

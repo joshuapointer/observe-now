@@ -44,3 +44,6 @@ yarn-error.*
 
 # autopilot / oh-my-claudecode state
 .omc/
+
+# Firebase emulator logs
+*-debug.log

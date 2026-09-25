@@ -19,15 +19,15 @@ const parentOf = (p: string) => p.slice(0, p.lastIndexOf("/"));
 const idOf = (p: string) => p.slice(p.lastIndexOf("/") + 1);
 
 export const DEMO_USERS: Record<"caregiver" | "family", User> = {
-  caregiver: { uid: "demo-caregiver", email: "garth@demo.local", emailVerified: true },
-  family: { uid: "demo-family", email: "ellen@demo.local", emailVerified: true },
+  caregiver: { uid: "demo-caregiver", email: "garth@demo.local", phone: "", verified: true },
+  family: { uid: "demo-family", email: "ellen@demo.local", phone: "", verified: true },
 };
 
 function seed(data: Record<string, Doc>) {
   const PP = `patients/${PATIENT_ID}`;
   if (!data[PP]) {
     data[PP] = { name: "Garth", careSetting: "Home, 24-hour care", pronouns: { he: "he", him: "him", his: "his", himself: "himself" }, meds: DEFAULT_MEDS, ownerUid: "demo-caregiver" };
-    data[`${PP}/members/demo-caregiver`] = { role: "caregiver", name: "Care iPad", relation: "", detail: "", owner: true };
+    data[`${PP}/members/demo-caregiver`] = { role: "caregiver", name: "Care device", relation: "", detail: "", owner: true };
     data[`${PP}/members/demo-family`] = { role: "family", name: "Ellen", relation: "daughter", detail: "Phone, 40 miles away · alerts on" };
     data[`${PP}/members/demo-family-2`] = { role: "family", name: "Ray", relation: "son", detail: "Phone, overseas · alerts on" };
     data[`${PP}/members/demo-family-3`] = { role: "family", name: "Nina", relation: "niece", detail: "Phone · alerts on" };
@@ -72,6 +72,9 @@ export function createLocalStore(): DataStore {
       authListeners.forEach(f => f(user));
     },
     signUp: async () => {},
+    sendPhoneCode: async () => {},
+    confirmPhoneCode: async () => {},
+    signInWithApple: async () => {},
     async signOut() {
       user = null;
       kv.del(USER_KEY);
@@ -84,12 +87,12 @@ export function createLocalStore(): DataStore {
     onStatus(cb) { cb({ ...status }); return () => {}; },
 
     watchDoc(path, cb) {
-      const w = () => cb(data[path] ? ({ id: idOf(path), ...data[path] } as never) : null, { fromCache: false });
+      const w = () => cb(data[path] ? ({ id: idOf(path), ...data[path] } as never) : null, { fromCache: false, pending: false });
       watchers.add(w); setTimeout(w, 0);
       return () => { watchers.delete(w); };
     },
     watchCol(path, cb) {
-      const w = () => cb(listCol(path) as never, { fromCache: false });
+      const w = () => cb(listCol(path) as never, { fromCache: false, pending: false });
       watchers.add(w); setTimeout(w, 0);
       return () => { watchers.delete(w); };
     },

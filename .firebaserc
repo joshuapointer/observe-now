@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "garth-log-dev",
+    "dev": "garth-log-dev",
+    "prod": "behavior-observation-2d03f"
+  }
+}

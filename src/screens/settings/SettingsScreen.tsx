@@ -8,9 +8,9 @@ import { DEMO } from "@/lib/config";
 import { activeCodes } from "@/lib/codes";
 import * as M from "@/lib/model";
 import {
-  editMeds, endShift, openModal, openPicker, setSetting, signOut,
+  editMeds, endShift, openModal, openPicker, setSetting, setViewAs, signOut, startAddPatient,
 } from "@/state/actions";
-import { useApp } from "@/state/app";
+import { actingAs, useApp } from "@/state/app";
 import { useView } from "@/state/view";
 import { useLayout } from "@/ui/layout";
 import { Card, ListRow, Row, Scroll, Screen, Seg, T } from "@/ui/primitives";
@@ -55,11 +55,16 @@ export function SettingsScreen() {
   const links = useApp(s => s.links);
   const pendingInvites = useApp(s => s.pendingInvites);
 
-  const isFamily = member?.role === "family";
-  const canSwitch = isFamily && ((links?.length || 0) > 1 || !!pendingInvites?.length);
+  const isFamily = useApp(s => actingAs(s)) === "family";
+  // The caregiver role (the care account, or family the owner has let act as caregivers) can use either mode.
+  const canCare = member?.role === "caregiver";
+  // Switch lists the people you can open in the current mode: in family mode, the ones you were invited to follow.
+  const sameMode = (links || []).filter(l => (l.role === "family") === isFamily);
+  const canSwitch = sameMode.length > 1 || !!pendingInvites?.length;
 
-  const acctTitle = isFamily ? member?.name || user?.email || "" : "This device";
-  const acctDetail = (isFamily ? "Family" : `Signed in as ${user?.email || ""} · stays signed in between shifts`) + (DEMO ? " · practice mode" : "");
+  const who = user?.email || user?.phone || "";
+  const acctTitle = isFamily ? member?.name || who : "This device";
+  const acctDetail = (isFamily ? "Family" : `Signed in as ${who} · stays signed in between shifts`) + (DEMO ? " · practice mode" : "");
 
   return (
     <Screen>
@@ -67,10 +72,24 @@ export function SettingsScreen() {
         <View style={{ width: "100%", maxWidth: isTablet ? 720 : undefined, alignSelf: "center", gap: 20 }}>
           <Section>
             <ListRow
-              title="Caring for"
-              detail={V.ctx.name}
-              right={canSwitch ? <Seg title="Switch" small onPress={openPicker} /> : undefined}
+              title={isFamily ? "Family member" : "Caring for"}
+              detail={isFamily ? `Following ${V.ctx.name}` : V.ctx.name}
+              right={canSwitch ? <Seg title="Switch" small onPress={() => openPicker(isFamily ? "family" : "care")} /> : undefined}
             />
+            {canCare ? (
+              <ListRow
+                title={isFamily ? "Caregiver mode" : "Family mode"}
+                detail={isFamily ? `Record and look after ${V.ctx.name}` : `See ${V.ctx.name}'s day the way family do`}
+                right={<Seg title="Switch" small onPress={() => setViewAs(isFamily ? "care" : "family")} />}
+              />
+            ) : null}
+            {isFamily ? null : (
+              <ListRow
+                title="Look after someone else"
+                detail="Add a person and be their caregiver"
+                right={<Seg title="Add" small onPress={startAddPatient} />}
+              />
+            )}
           </Section>
 
           {isFamily ? null : (

@@ -8,10 +8,11 @@ import { FlatList, Pressable, StyleSheet, View, type ScrollView } from "react-na
 import * as M from "@/lib/model";
 import type { Message } from "@/lib/types";
 import { markThreadRead, openThread, openThreadId, sendNew, sendReply, setDraft } from "@/state/actions";
-import { useApp } from "@/state/app";
+import { actingAs, useApp } from "@/state/app";
 import { setOnNotes } from "@/state/session";
 import { fromCaregiver, msgWho, msgWhen, useView, type Thread, type View as ViewState } from "@/state/view";
 import { RAIL_WIDTH, useLayout } from "@/ui/layout";
+import { ChatBubble } from "@/ui/ChatBubble";
 import { Button, Field, KeyboardArea, Scroll, Screen, T } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
 
@@ -52,27 +53,11 @@ function ThreadRow({ th, V, selected, onPress }: { th: Thread; V: ViewState; sel
   );
 }
 
-function Bubble({ n, V }: { n: Message; V: ViewState }) {
-  const t = useTheme();
-  const mine = fromCaregiver(n);
-  return (
-    <View
-      style={[
-        styles.bubble,
-        {
-          backgroundColor: mine ? t.c.press : t.c.panel,
-          alignSelf: mine ? "flex-end" : "flex-start",
-          borderLeftWidth: mine ? 0 : 3,
-          borderLeftColor: t.cat("sleep").a,
-          borderRightWidth: mine ? 3 : 0,
-          borderRightColor: t.c.live,
-        },
-      ]}
-    >
-      <T v="small" weight="bold" color={t.c.mute}>{`${msgWho(n)} · ${msgWhen(n, V)}`}</T>
-      <T style={{ marginTop: 3 }}>{n.text}</T>
-    </View>
-  );
+// Your side's messages sit on the right: the caregivers' in caregiver mode (whoever was on shift), family's in
+// family mode. On the right the name is left off, as in iMessage; the other side's always say who.
+function Bubble({ n, V, family }: { n: Message; V: ViewState; family: boolean }) {
+  const mine = fromCaregiver(n) !== family;
+  return <ChatBubble text={n.text} mine={mine} who={msgWho(n)} when={mine && fromCaregiver(n) ? `${n.who} · ${msgWhen(n, V)}` : msgWhen(n, V)} />;
 }
 
 export function MessagesScreen() {
@@ -83,6 +68,7 @@ export function MessagesScreen() {
   const draftReply = useApp(s => s.drafts.reply || "");
   const draftNew = useApp(s => s.drafts.newmsg || "");
   const onShiftName = M.firstName(V.onShift?.name);
+  const family = useApp(s => actingAs(s)) === "family";
   const [phoneOpen, setPhoneOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -151,21 +137,21 @@ export function MessagesScreen() {
           ) : null}
           <View style={[styles.bar, { backgroundColor: t.colorful ? t.c.panel : t.c.chrome }]}>
             <T v="label" color={t.colorful ? t.c.ink : t.c.onChrome} numberOfLines={1} style={{ flex: 1 }}>
-              {sel ? `${sel.root.who} started this conversation · ${msgWhen(sel.root, V)}` : "New message to family"}
+              {sel ? `${sel.root.who} started this conversation · ${msgWhen(sel.root, V)}` : family ? `New message to ${V.ctx.caregiver}` : "New message to family"}
             </T>
           </View>
           {sel ? (
             <Scroll ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.chatlog}>
-              <Bubble n={sel.root} V={V} />
-              {sel.replies.length ? (
-                <View style={[styles.replies, { borderLeftColor: t.cat("sleep").a }]}>
-                  {sel.replies.map(r => <Bubble key={r.id} n={r} V={V} />)}
-                </View>
-              ) : null}
+              <Bubble n={sel.root} V={V} family={family} />
+              {sel.replies.map(r => <Bubble key={r.id} n={r} V={V} family={family} />)}
             </Scroll>
           ) : (
             <View style={{ flex: 1, padding: 24 }}>
-              <T color={t.c.mute}>Write something for family to read. They see it in their list of updates, and can reply.</T>
+              <T color={t.c.mute}>
+                {family
+                  ? `Write something for ${V.ctx.caregiver}. It shows in the care app's Messages, and they can reply.`
+                  : "Write something for family to read. They see it in their list of updates, and can reply."}
+              </T>
             </View>
           )}
           <View style={[styles.composeRow, { borderTopColor: t.colorful ? t.c.line : t.c.edge, borderTopWidth: t.colorful ? StyleSheet.hairlineWidth : 2 }]}>
@@ -173,7 +159,7 @@ export function MessagesScreen() {
               style={{ flex: 1 }}
               value={sel ? draftReply : draftNew}
               onChangeText={v => setDraft(sel ? "reply" : "newmsg", v)}
-              placeholder={sel ? `Reply as ${onShiftName}…` : `Write to family as ${onShiftName}…`}
+              placeholder={family ? (sel ? "Write your reply…" : `Write to ${V.ctx.caregiver}…`) : sel ? `Reply as ${onShiftName}…` : `Write to family as ${onShiftName}…`}
               accessibilityLabel={sel ? "Reply" : "New message"}
               autoCapitalize="sentences"
               returnKeyType="send"
@@ -197,7 +183,5 @@ const styles = StyleSheet.create({
   backRow: { flexDirection: "row", alignItems: "center", gap: 4, padding: 12, alignSelf: "flex-start" },
   bar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10 },
   chatlog: { padding: 16, gap: 10, flexGrow: 1, justifyContent: "flex-end" },
-  bubble: { maxWidth: "82%", padding: 10, borderRadius: 14, gap: 0 },
-  replies: { marginLeft: 20, paddingLeft: 12, borderLeftWidth: 2, gap: 10 },
   composeRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12 },
 });

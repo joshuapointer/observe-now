@@ -1,10 +1,14 @@
-export type User = { uid: string; email: string; emailVerified: boolean };
+// email is "" for a phone-only account and phone is "" otherwise. verified: a confirmed email address or a
+// phone number (which is confirmed by the text code it signed in with).
+export type User = { uid: string; email: string; phone: string; verified: boolean };
 export type SyncStatus = { online: boolean; pending: number; lastSync: number };
 
-// fromCache: the snapshot came from the local cache, not the server. With the memory-only cache the JS SDK
-// has on React Native, a cold start while offline reports "doesn't exist" from cache for everything, so
-// anything that deletes or creates on absence must wait for a server answer.
-export type SnapMeta = { fromCache: boolean };
+// fromCache: the snapshot came from the local cache, not the server. A cold start offline, or a document never
+// synced to this device, reads as "doesn't exist" from cache, so anything that deletes or creates on absence must
+// wait for a server answer.
+// pending: it includes this device's own writes the server hasn't confirmed yet. Security rules are checked
+// against the server's state, so nothing that reads *other* documents may act on a pending snapshot.
+export type SnapMeta = { fromCache: boolean; pending: boolean };
 
 export type Op = { path: string; data: Record<string, unknown>; merge?: boolean };
 export type Unsub = () => void;
@@ -14,6 +18,9 @@ export interface DataStore {
   onAuth(cb: (u: User | null) => void): Unsub;
   signIn(email: string, pw?: string): Promise<unknown>;
   signUp(email: string, pw: string): Promise<void>;
+  sendPhoneCode(phone: string): Promise<void>;
+  confirmPhoneCode(code: string): Promise<void>;
+  signInWithApple(): Promise<void>;
   signOut(): Promise<void>;
   sendVerification(): Promise<void>;
   resetPassword(email: string): Promise<void>;

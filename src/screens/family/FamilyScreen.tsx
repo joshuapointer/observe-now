@@ -2,13 +2,13 @@
 // Port of the PWA's familyView + the preview wrapper + familyRules (views.js).
 import { useEffect, useMemo, useRef } from "react";
 import { FlatList, Pressable, StyleSheet, View, type TextInput } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as M from "@/lib/model";
 import type { Entry, Message } from "@/lib/types";
 import { ackAlert, replyTo as setReplyTo, reveal, sendFamilyNote, setDraft } from "@/state/actions";
 import { useApp } from "@/state/app";
-import { fromCaregiver, msgWho, nowDetail, nowText, useView, whoBy, type Thread } from "@/state/view";
+import { msgWho, nowDetail, nowText, useView, whoBy, type Thread } from "@/state/view";
+import { ChatBubble } from "@/ui/ChatBubble";
 import { useLayout } from "@/ui/layout";
 import { Button, Card, Field, KeyboardArea, Screen, T } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
@@ -18,7 +18,7 @@ type FeedItem = { at: number; x: Entry } | { at: number; t: Thread };
 const FAMILY_RULES: [string, string][] = [
   ["Plain words, not codes", "Family read everyday sentences. Tapping a line shows the clinical code that was recorded."],
   ["Red alerts are rare", "Only a fall, grabbing or pushing, or pain of 7 or more sends a red alert. Everything else waits quietly in the list."],
-  ["Replies come to the iPad", "A message from family appears on the right-hand side of the Record screen. It doesn't ring or interrupt."],
+  ["Messages go to the caregiver", "A message from family shows up in the care app's Messages tab and on the Record screen, on whichever phone or tablet it's open on. It doesn't ring or interrupt."],
 ];
 
 function RulesSection() {
@@ -35,26 +35,13 @@ function RulesSection() {
   );
 }
 
-function MessageBubble({ n, me, isNew, reply }: { n: Message; me?: string; isNew: boolean; reply?: boolean }) {
-  const t = useTheme();
-  const mine = n.uid === me;
-  return (
-    <View style={[styles.msgcard, reply && styles.msgcardReply]}>
-      <View style={styles.msgwhoRow}>
-        <T v="small" weight="bold" color={mine ? t.c.accentInk : fromCaregiver(n) ? t.c.ink : t.cat("sleep").ink}>
-          {(mine ? "You" : msgWho(n)) + (isNew ? " · new" : "")}
-        </T>
-        <T v="small" color={t.c.mute}>{M.hhmm(n.at)}</T>
-      </View>
-      <T style={{ marginTop: 2 }}>{n.text}</T>
-    </View>
-  );
+function MessageBubble({ n, me, isNew }: { n: Message; me?: string; isNew: boolean }) {
+  return <ChatBubble text={n.text} mine={n.uid === me} who={msgWho(n)} when={M.hhmm(n.at)} isNew={isNew} />;
 }
 
 // framed = the caregiver's preview of the family screen (no sending, no acks).
 export function FamilyScreen({ framed = false }: { framed?: boolean }) {
   const t = useTheme();
-  const insets = useSafeAreaInsets();
   const { isTablet } = useLayout();
   const V = useView();
   const me = useApp(s => s.user?.uid);
@@ -74,10 +61,12 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
   const recent = !!al && V.now - al.at < 12 * 3600e3;
   const who = e ? whoBy(e, V) : "";
 
+  // In time order: an entry sits at its interval (a box filled in later stays where it belongs), a message at
+  // when it was sent.
   const items = useMemo<FeedItem[]>(() => {
     const entries: FeedItem[] = [...V.D.entries, ...V.PD.entries]
       .filter(x => M.entryCodes(x).length || x.note)
-      .map(x => ({ at: x.markedAt, x }));
+      .map(x => ({ at: x.slotStart, x }));
     const threads: FeedItem[] = V.threads.map(th => ({ at: th.root.at, t: th }));
     return [...entries, ...threads].sort((a, b) => b.at - a.at).slice(0, 40);
   }, [V.D.entries, V.PD.entries, V.threads]);
@@ -95,21 +84,19 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
     if ("t" in item) {
       const th = item.t;
       const isReplying = replyToThread?.root.id === th.root.id;
+      // A conversation reads like a chat: the first message and its replies in order, then "Reply".
       return (
         <View
           style={[
             styles.thread,
-            { backgroundColor: t.cat("sleep").bg },
-            isReplying && { borderWidth: 2, borderColor: t.cat("sleep").a },
+            { backgroundColor: t.c.ground, borderRadius: t.colorful ? 20 : t.r.md },
+            t.shadow,
+            t.colorful ? null : { borderWidth: 2, borderColor: t.c.edge },
+            isReplying && { borderWidth: 2, borderColor: t.c.accent },
           ]}
         >
-          <T v="eyebrow" color={t.cat("sleep").ink}>Message</T>
           <MessageBubble n={th.root} me={me} isNew={isNew(th.root.at, th.root.uid)} />
-          {th.replies.length ? (
-            <View style={[styles.replies, { borderLeftColor: t.cat("sleep").a }]}>
-              {th.replies.map(r => <MessageBubble key={r.id} n={r} me={me} isNew={isNew(r.at, r.uid)} reply />)}
-            </View>
-          ) : null}
+          {th.replies.map(r => <MessageBubble key={r.id} n={r} me={me} isNew={isNew(r.at, r.uid)} />)}
           {noteAllowed ? (
             <Pressable accessibilityRole="button" onPress={() => setReplyTo(th.root.id)} hitSlop={8} style={styles.replyLink}>
               <T v="label" color={t.c.accentInk}>
@@ -128,7 +115,7 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${M.hhmm(x.markedAt)}: ${M.entryLine(x, V.ctx, true)}`}
+        accessibilityLabel={`${M.hhmm(x.slotStart)}: ${M.entryLine(x, V.ctx, true)}`}
         onPress={() => reveal(key)}
         style={({ pressed }) => [
           styles.feedline,
@@ -136,7 +123,7 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
           pressed && { opacity: 0.85 },
         ]}
       >
-        <T v="small" color={t.c.mute} numberOfLines={1} style={{ width: M.clock.h12 ? 64 : 46 }}>{M.hhmm(x.markedAt)}</T>
+        <T v="small" color={t.c.mute} numberOfLines={1} style={{ width: M.clock.h12 ? 64 : 46 }}>{M.hhmm(x.slotStart)}</T>
         <View style={{ flex: 1 }}>
           <T weight={newFlag ? "bold" : undefined}>{M.entryLine(x, V.ctx, true)}</T>
           {by ? <T v="small" color={t.c.mute}>{by}</T> : null}
@@ -161,16 +148,20 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
     </>
   );
 
+  // On a family phone the feed is the whole screen, edge to edge. It's a floating card on a tablet (centred, not
+  // stretched across a wide screen) and in the caregivers' "What family see" preview.
+  const floating = framed || isTablet;
+  const radius = floating ? t.r.lg : 0;
   const card = (
     <View
       style={[
         styles.card,
-        { backgroundColor: t.c.ground, borderRadius: t.r.lg },
-        framed ? t.shadowLg : t.shadow,
+        { backgroundColor: t.c.ground, borderRadius: radius },
+        floating ? (framed ? t.shadowLg : t.shadow) : null,
         framed && !t.colorful ? { borderWidth: 2, borderColor: t.c.edge } : null,
       ]}
     >
-      <View style={[styles.head, { backgroundColor: cat.a, borderTopLeftRadius: t.r.lg, borderTopRightRadius: t.r.lg }]}>
+      <View style={[styles.head, { backgroundColor: cat.a, borderTopLeftRadius: radius, borderTopRightRadius: radius }]}>
         <T v="eyebrow" color="#fff">{`${V.ctx.name} · right now`}</T>
         <T v="big" color="#fff" style={{ marginTop: 6 }} accessibilityLiveRegion="polite">{nowText(e, V, true)}</T>
         {nowDetail(e) ? <T color="rgba(255,255,255,0.92)" style={{ marginTop: 6 }}>{nowDetail(e)}</T> : null}
@@ -220,7 +211,7 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
           {
             borderTopColor: t.colorful ? t.c.line : t.c.edge,
             borderTopWidth: t.colorful ? StyleSheet.hairlineWidth : 2,
-            paddingBottom: 10 + (framed ? 0 : insets.bottom),
+            paddingBottom: 10, // the tab bar below takes care of the home indicator
             opacity: noteAllowed ? 1 : 0.6,
           },
         ]}
@@ -255,8 +246,10 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
 
   return (
     <Screen>
-      <KeyboardArea style={{ flex: 1, alignItems: "center", paddingHorizontal: insets.left || insets.right ? 0 : 0 }}>
-        <View style={{ flex: 1, width: "100%", maxWidth: isTablet ? 640 : undefined, padding: framed ? 16 : 0 }}>{card}</View>
+      <KeyboardArea>
+        <View style={{ flex: 1, width: "100%", maxWidth: isTablet ? 640 : undefined, alignSelf: "center", padding: floating ? 16 : 0 }}>
+          {card}
+        </View>
       </KeyboardArea>
     </Screen>
   );
@@ -272,12 +265,8 @@ const styles = StyleSheet.create({
   newcount: { marginHorizontal: 14, marginTop: 10, paddingHorizontal: 14, paddingVertical: 6, alignSelf: "flex-start" },
   sectionLabel: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
   feedline: { flexDirection: "row", gap: 10, marginHorizontal: 12, marginVertical: 6, padding: 14, borderRadius: 14 },
-  thread: { marginHorizontal: 12, marginVertical: 6, padding: 12, borderRadius: 16, gap: 2 },
-  replies: { marginLeft: 18, marginTop: 4, paddingLeft: 12, borderLeftWidth: 2, gap: 6 },
-  msgcard: { paddingVertical: 4 },
-  msgcardReply: { paddingVertical: 3 },
-  msgwhoRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
-  replyLink: { paddingVertical: 8, minHeight: 40, justifyContent: "center" },
+  thread: { marginHorizontal: 12, marginVertical: 8, paddingTop: 12, paddingHorizontal: 10, paddingBottom: 2, gap: 8 },
+  replyLink: { paddingVertical: 8, paddingHorizontal: 14, minHeight: 40, justifyContent: "center", alignSelf: "flex-start" },
   replyingBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8 },
   compose: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingTop: 10 },
   rules: { gap: 12, padding: 14 },

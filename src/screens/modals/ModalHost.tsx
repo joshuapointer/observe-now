@@ -12,9 +12,9 @@ import * as M from "@/lib/model";
 import type { Caregiver, Ctx, Entry, Member, OnShift, Patient } from "@/lib/types";
 import {
   cgEdit, cgNew, cgRemove, closeModal, editField, editUncode, invite, LOCKED_CODES, medCancel, medEdit,
-  medField, medNew, medRemove, medSave, medToggleNeeded, saveDetails, saveEdit,
+  medField, medNew, medRemove, medSave, medToggleNeeded, saveDetails, saveEdit, setCanCare,
 } from "@/state/actions";
-import { useApp, type CgForm, type EditForm, type MedForm, type ModalId } from "@/state/app";
+import { actingAs, useApp, type CgForm, type EditForm, type MedForm, type ModalId } from "@/state/app";
 import { notAsked, useView, type View as ComputedView } from "@/state/view";
 import { CaregiverForm } from "@/screens/gate/CaregiverForm";
 import { useLayout } from "@/ui/layout";
@@ -39,7 +39,7 @@ function helpFor(pathname: string, isFamily: boolean, V: ComputedView): [string,
       [`The big box at the top shows what ${n} is doing right now. ${c} updates it through the day.`],
       ["A red box is an important alert. Tap ", b("Got it"), " once you've read it."],
       ["Tap any line in the list to see the exact clinical code."],
-      [`Type in the box at the bottom to send ${c} a message. They'll see it on the iPad.`],
+      [`Type in the box at the bottom to send ${c} a message. They'll see it in the care app, on whichever phone or tablet it's open on.`],
       ["Messages appear in the list with everything else, with replies underneath. Tap ", b("Reply"), " to answer one."],
     ]];
   }
@@ -284,6 +284,19 @@ function PeopleBody({ family, live, isOwner }: { family: Member[]; live: Member[
                 <T v="small" color={on ? t.c.live : undefined}>{on ? "Watching now" : "Not online"}</T>
               </Row>
               {m.detail ? <T v="small">{m.detail}</T> : null}
+              {isOwner ? (
+                <Row style={{ justifyContent: "space-between", marginTop: 4 }}>
+                  <T v="small" style={{ flex: 1 }}>
+                    {m.role === "caregiver" ? "Can also act as a caregiver" : "Family only"}
+                  </T>
+                  <Seg
+                    small
+                    title={m.role === "caregiver" ? "Stop" : "Let them care"}
+                    accessibilityLabel={m.role === "caregiver" ? `Stop ${m.name} acting as a caregiver` : `Let ${m.name} also act as a caregiver`}
+                    onPress={() => setCanCare(m.id, m.role !== "caregiver")}
+                  />
+                </Row>
+              ) : null}
             </View>
           );
         }) : <T v="small">No family on this log yet.</T>}
@@ -293,7 +306,7 @@ function PeopleBody({ family, live, isOwner }: { family: Member[]; live: Member[
         <View style={{ gap: 10 }}>
           <Rule />
           <T v="eyebrow">Invite a family member</T>
-          <Field placeholder="Their email address" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="off" autoCorrect={false} />
+          <Field placeholder="Their email address or mobile number" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="off" autoCorrect={false} />
           <Field placeholder="Their name" value={name} onChangeText={setName} autoComplete="off" />
           <Field placeholder="How they're related (daughter, son…)" value={relation} onChangeText={setRelation} autoComplete="off" />
           <Field placeholder="Anything useful (for example: lives overseas)" value={detail} onChangeText={setDetail} autoComplete="off" />
@@ -301,9 +314,9 @@ function PeopleBody({ family, live, isOwner }: { family: Member[]; live: Member[
             kind="primary"
             big
             title="Send invitation"
-            onPress={() => { if (invite({ email, name, relation, detail })) { setEmail(""); setName(""); setRelation(""); setDetail(""); } }}
+            onPress={() => { if (invite({ contact: email, name, relation, detail })) { setEmail(""); setName(""); setRelation(""); setDetail(""); } }}
           />
-          <T v="small">{"They sign up on their own phone with this email address and are let in automatically. Caregivers don't need an invitation: add them under Settings → Caregivers."}</T>
+          <T v="small">{"They sign in on their own phone or tablet with this email address or mobile number and are let in automatically. Caregivers don't need an invitation: add them under Settings → Caregivers."}</T>
         </View>
       ) : null}
       <Button big title="Done" onPress={closeModal} />
@@ -359,13 +372,12 @@ function EditEntryBody({ edit, entry, ctx, plain }: { edit: EditForm; entry: Ent
 function ModalContent({ modal }: { modal: NonNullable<ModalId> }) {
   const V = useView();
   const pathname = usePathname();
-  const member = useApp(s => s.member);
   const medForm = useApp(s => s.medForm);
   const cgForm = useApp(s => s.cgForm);
   const patient = useApp(s => s.patient);
   const edit = useApp(s => s.edit);
   const data = useApp(s => s.data);
-  const isFamily = member?.role === "family";
+  const isFamily = useApp(s => actingAs(s)) === "family";
   const editEntry = edit ? data[edit.sid]?.entries.find(e => e.id === edit.id) || null : null;
 
   // Guards against the entry an open edit modal points at disappearing from under it (e.g. removed elsewhere).

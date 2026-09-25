@@ -17,7 +17,7 @@ export function RailNow({ V, t, tablet }: { V: ViewModel; t: Theme; tablet: bool
   const cat = primary ? ctx.reg.CAT[primary] || null : null, k = t.cat(cat), fg = onFill(t, cat);
   const big = codes.length
     ? plain
-      ? codes.map(c => M.codeText(c, ctx)).join(", ")
+      ? M.codesText(codes, ctx)
       : codes.map(c => `${M.codeLabel(c, ctx)} — ${M.codeText(c, ctx, false).split(" — ")[0]}`).join("; ")
     : "Nothing recorded yet";
   const who = whoBy(e, V);

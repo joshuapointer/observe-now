@@ -1,0 +1,121 @@
+rules_version = '2';
+
+// Any number of patients: patients/{id}. Each has its own members, so people only ever see the patients they belong to.
+// caregiver → full access to the log. In practice this is one shared login per patient on the care device, and the
+// person on duty starts a shift by picking their name (patients/{p}/caregivers).
+// family → their own logins; read-only, plus notes to the caregiver and acknowledging alerts.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function patientDoc(p) { return /databases/$(db)/documents/patients/$(p); }
+    function memberDoc(p) { return /databases/$(db)/documents/patients/$(p)/members/$(request.auth.uid); }
+    // A token only carries the claims for how the account signs in: email (+ email_verified) for email/password
+    // and usually Apple, phone_number for a texted code. .get() with a default keeps a missing claim from erroring.
+    function email() { return request.auth.token.get('email', '').lower(); }
+    function phone() { return request.auth.token.get('phone_number', ''); }
+    function provider() { return request.auth.token.get('firebase', {}).get('sign_in_provider', ''); }
+    function emailInvite(p) { return /databases/$(db)/documents/invitesByEmail/$(email())/for/$(p); }
+    function phoneInvite(p) { return /databases/$(db)/documents/invitesByPhone/$(phone())/for/$(p); }
+    // Verified: a confirmed email address, a phone number (confirmed by the code it signed in with), or an Apple
+    // account (Apple has verified the person; it may share no email, or a private relay one).
+    function verified() {
+      return signedIn() && (request.auth.token.get('email_verified', false) == true || phone() != '' || provider() == 'apple.com');
+    }
+    function invitedAs(p, role) {
+      return (email() != '' && exists(emailInvite(p)) && get(emailInvite(p)).data.role == role)
+        || (phone() != '' && exists(phoneInvite(p)) && get(phoneInvite(p)).data.role == role);
+    }
+
+    function isMember(p) { return signedIn() && exists(memberDoc(p)); }
+    function isCaregiver(p) { return isMember(p) && get(memberDoc(p)).data.role == 'caregiver'; }
+    function isOwner(p) { return signedIn() && get(patientDoc(p)).data.ownerUid == request.auth.uid; }
+
+    // "Who do I look after?" list, one per user. It is only a shortcut: real access is always decided by patients/{p}/members.
+    match /users/{u}/patients/{p} {
+      allow read, write: if signedIn() && u == request.auth.uid;
+    }
+
+    // Invitations are filed by the invitee's email, or by their mobile number in E.164 form ("+14155550123",
+    // the phone_number claim), so they can find every patient that invited them.
+    match /invitesByEmail/{addr}/for/{p} {
+      allow get: if isOwner(p) || (verified() && email() == addr);
+      allow list: if verified() && email() == addr;
+      allow create, update, delete: if isOwner(p);
+    }
+    match /invitesByPhone/{number}/for/{p} {
+      allow get: if isOwner(p) || (verified() && phone() == number);
+      allow list: if verified() && phone() == number;
+      allow create, update, delete: if isOwner(p);
+    }
+
+    match /patients/{p} {
+      allow read: if isMember(p);
+      // Anyone verified (email or phone) can register a patient and becomes its owner.
+      allow create: if verified() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isCaregiver(p) && request.resource.data.ownerUid == resource.data.ownerUid;
+
+      match /members/{u} {
+        allow read: if isMember(p) || (signedIn() && u == request.auth.uid);
+        allow create: if verified() && u == request.auth.uid && (
+          // owner bootstrapping, in the same batch that creates the patient
+          (request.resource.data.role == 'caregiver' && getAfter(patientDoc(p)).data.ownerUid == u)
+          // joining through an invite for this account's verified email address or phone number
+          || invitedAs(p, request.resource.data.role)
+        );
+        allow update, delete: if isOwner(p);
+      }
+
+      // The caregiver roster for the shared device: names and hashed shift PINs. Families never see it.
+      match /caregivers/{c} {
+        allow read, write: if isCaregiver(p);
+      }
+
+      // Who was on shift when. The live "who's on now" is patients/{p}.onShift.
+      match /shiftLog/{s} {
+        allow read: if isMember(p);
+        allow create, update: if isCaregiver(p);
+      }
+
+      match /presence/{u} {
+        allow read: if isMember(p);
+        allow write: if isMember(p) && u == request.auth.uid;
+      }
+
+      // One document per calendar day (id is just the date, e.g. "2026-09-23") — the collection is still
+      // named "shifts" because renaming it would orphan any data already written under the old id format
+      // (date-plus-shift-name); nothing in the app or its data model calls these "shifts" any more.
+      match /shifts/{s} {
+        allow read: if isMember(p);
+        allow create, update: if isCaregiver(p);
+
+        match /entries/{e} {
+          allow read: if isMember(p);
+          allow write: if isCaregiver(p);
+        }
+
+        // Notes marked "keep it off the family feed" live here, so families cannot read them at all.
+        match /privateNotes/{e} {
+          allow read, write: if isCaregiver(p);
+        }
+
+        // Messages both ways: family → caregiver, and caregiver replies (role 'caregiver', caregiver login only).
+        match /familyNotes/{n} {
+          allow read: if isMember(p);
+          allow create: if isMember(p) && request.resource.data.uid == request.auth.uid
+            && (request.resource.data.get('role', 'family') != 'caregiver' || isCaregiver(p));
+        }
+
+        match /alerts/{a} {
+          allow read: if isMember(p);
+          allow create: if isCaregiver(p);
+          allow update: if isCaregiver(p) || (
+            isMember(p)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['acks'])
+            && request.resource.data.acks.diff(resource.data.acks).affectedKeys().hasOnly([request.auth.uid])
+          );
+        }
+      }
+    }
+  }
+}

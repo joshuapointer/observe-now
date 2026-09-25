@@ -63,7 +63,7 @@ export function Strip({ V, target, collapsed, grid, width, t }: StripProps) {
     const key = M.slotKey(info, i), e = d.byKey[key], codes = M.entryCodes(e), time = info.start + i * M.SLOT_MS;
     const fall = codes.includes("FL"), primary = fall ? "FL" : codes[0] || "";
     const isNow = i === d.cur && d.inToday;
-    const label = codes.length ? codes.map(c => M.codeText(c, ctx)).join(", ") : "empty";
+    const label = codes.length ? M.codesText(codes, ctx) : "empty";
     const mark = codes.length ? M.codeLabel(primary, ctx) : e?.note ? "✎" : isNow ? "·" : "";
     return (
       <SlotBox

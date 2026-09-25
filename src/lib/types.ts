@@ -27,6 +27,9 @@ export type Member = {
   detail?: string;
   digestOnly?: boolean;
   owner?: boolean;
+  // Joined through a family invitation. Stays true when the owner also lets them act as a caregiver (role then
+  // becomes "caregiver"), so they still count as family and open in family mode by default.
+  family?: boolean;
 };
 
 export type Caregiver = { id: string; name: string; pin?: string; createdAt?: number };

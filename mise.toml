@@ -1,14 +1,19 @@
 [tools]
 node = "lts"
+java = "temurin-21" # Firestore emulator, for npm run test:rules
 
 [tasks.start]
-description = "Start Metro against the dev Firebase project (garth-log-dev)"
+description = "Start Metro for the dev build (Observe Now Dev, garth-log-dev); build it once with `npx expo run:ios`"
 run = "npx expo start"
 
 [tasks.demo]
 description = "Start Metro in practice mode (local data only, never touches Firebase)"
-run = "EXPO_PUBLIC_APP_ENV=demo npx expo start"
+run = "EXPO_PUBLIC_APP_ENV=demo npx expo start --go"
 
 [tasks.check]
 description = "Typecheck, lint and test"
 run = "npx tsc --noEmit && npx expo lint && npx jest"
+
+[tasks."test:rules"]
+description = "Test the Firestore security rules in the emulator"
+run = "npm run test:rules"

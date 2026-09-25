@@ -1,0 +1,40 @@
+# Firestore rules and indexes: tested in the emulator on every push and pull request that touches them, then
+# deployed — pushes to `beta` go to garth-log-dev (shared by the dev and beta apps), pushes to `main` go to prod.
+name: Firestore rules
+
+on:
+  push:
+    branches: [dev, beta, main]
+    paths: [firebase/firestore.rules, firebase/firestore.indexes.json, firebase/rules.test.mjs, firebase.json, .firebaserc]
+  pull_request:
+    paths: [firebase/firestore.rules, firebase/firestore.indexes.json, firebase/rules.test.mjs, firebase.json, .firebaserc]
+  workflow_dispatch:
+
+concurrency: firestore-${{ github.ref }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: lts/*, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - run: npm ci
+      - run: npm run test:rules
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    # The environments hold the service-account secret; add required reviewers on "prod" to gate it.
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: lts/*, cache: npm }
+      - run: npm ci
+      - uses: google-github-actions/auth@v2
+        with: { credentials_json: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" }
+      - run: npx firebase deploy --only firestore --project ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }} --non-interactive
