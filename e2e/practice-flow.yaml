@@ -1,0 +1,148 @@
+# Practice-mode walk-through on an iPhone simulator. Start Metro first: npm run demo
+# Expo Go must be installed on the simulator (npx expo start --ios does that once).
+appId: host.exp.Exponent
+---
+- launchApp:
+    clearState: true
+- openLink: exp://127.0.0.1:8081
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+- extendedWaitUntil:
+    visible: "Continue|The care iPad.*|Reload"
+    timeout: 90000
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - swipe:
+          start: 50%, 50%
+          end: 50%, 98%
+      - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "The care iPad · caregivers start shifts here"
+    timeout: 30000
+- takeScreenshot: 01-auth
+- tapOn: "The care iPad · caregivers start shifts here"
+- extendedWaitUntil:
+    visible: "Start a shift"
+    timeout: 15000
+- takeScreenshot: 02-roster
+- tapOn: "Dana R."
+- takeScreenshot: 03-pin
+- tapOn: "Digit 1"
+- tapOn: "Digit 2"
+- tapOn: "Digit 3"
+- tapOn: "Digit 4"
+- extendedWaitUntil:
+    visible: "Welcome to Observe Now|Welcome to Garth Log"
+    timeout: 15000
+- takeScreenshot: 04-welcome
+- tapOn: "Got it"
+- takeScreenshot: 05-record
+- tapOn: "Sleep and waking.*"
+- tapOn: ".*Sleeping.*"
+- takeScreenshot: 06-step2
+- tapOn: "Save .*"
+- takeScreenshot: 07-saved
+- assertVisible: "Saved.*"
+- tapOn: "Undo"
+- assertVisible: "Undone"
+- tapOn: "Sleep and waking.*"
+- tapOn: ".*Dozing off.*"
+- tapOn: "Save .*"
+- scrollUntilVisible:
+    element: "What's been recorded"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: 08-feed
+- tapOn: "Messages.*tab.*"
+- takeScreenshot: 09-messages
+- tapOn: "New message"
+- tapOn: "Write to family as Dana…"
+- inputText: "Garth had a good dinner"
+- tapOn: "Send"
+- takeScreenshot: 10-sent
+- hideKeyboard:
+    optional: true
+- takeScreenshot: 10b-thread
+- tapOn: "Notes.*tab.*"
+- takeScreenshot: 11-notes
+- tapOn:
+    text: "Give now"
+    index: 0
+- takeScreenshot: 12-given
+- tapOn: "This week.*tab.*"
+- extendedWaitUntil:
+    visible: "Seven nights.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "What the week shows"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: 13-week
+- tapOn: "Settings.*tab.*"
+- takeScreenshot: 14-settings
+- scrollUntilVisible:
+    element: "Preview"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Preview"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Good to know|GOOD TO KNOW"
+    timeout: 10000
+- takeScreenshot: 15-preview
+- tapOn: "Back"
+- tapOn: "Record.*tab.*"
+- scrollUntilVisible:
+    element: "Care, safety and body.*"
+    direction: UP
+    centerElement: true
+- tapOn: "Care, safety and body.*"
+- scrollUntilVisible:
+    element: ".*A fall.*"
+    direction: DOWN
+    centerElement: true
+- tapOn: ".*A fall.*"
+- takeScreenshot: 16-fall-confirm
+- tapOn: "Yes — Garth had a fall"
+- extendedWaitUntil:
+    visible: "Fall recorded at.*"
+    timeout: 10000
+- tapOn: "Beside the bed"
+- takeScreenshot: 17-fall-report
+- tapOn: "Back"
+- takeScreenshot: 18-record-after-fall
+- tapOn: "Settings.*tab.*"
+- scrollUntilVisible:
+    element: "Sign out"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Sign out"
+- tapOn: "Yes, sign out"
+- tapOn: "Family · Ellen.*"
+- extendedWaitUntil:
+    visible: "Got it"
+    timeout: 15000
+- takeScreenshot: 19-family-welcome
+- tapOn: "Got it"
+- extendedWaitUntil:
+    visible: ".*right now.*"
+    timeout: 15000
+- takeScreenshot: 20-family
+- tapOn: "Got it"
+- takeScreenshot: 21-family-acked
+- tapOn: "Reply.*"
+- inputText: "Thank you Dana"
+- tapOn: "Send"
+- hideKeyboard:
+    optional: true
+- takeScreenshot: 22-family-replied

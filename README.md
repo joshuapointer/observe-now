@@ -44,6 +44,14 @@ npm test          # model, codes, and PIN-hash parity with the PWA
 mise run check    # all three
 ```
 
+End-to-end, in the iOS Simulator with [Maestro](https://maestro.mobile.dev) (`mise use maestro`, needs Java):
+
+```sh
+npm run demo                                   # Metro on :8081 in practice mode
+maestro test e2e/practice-flow.yaml            # iPhone: shift, record, undo, message, medicine, week,
+                                               # settings, preview, fall report, then family: alert, reply
+```
+
 ## How it's built
 
 ```
@@ -82,5 +90,14 @@ src/screens/        the screens
   sent when the connection returns *as long as the app stays open*; the PWA's IndexedDB cache survived a
   restart. The app guards against the one dangerous case (an offline cold start mistaking "no cached data"
   for "you've lost access") by only acting on server answers.
-- **Store builds** aren't set up (no EAS project). Bundle ids are `com.joshpointer.observenow` on both
-  platforms. For a TestFlight/Play build: `npx eas-cli@latest build`.
+- **Store builds** aren't set up (no EAS project yet). `eas.json` pins the backend per profile — `preview`
+  talks to dev, `production` to prod — so a build can't point at the wrong one. Bundle ids are
+  `com.joshpointer.observenow`. For a TestFlight/Play build: `npx eas-cli@latest build --profile production`.
+- **Before a production build**, the prod Firebase web API key may be locked to the PWA's website (HTTP
+  referrers). React Native sends no referrer, so give the app its own key restricted to Identity Toolkit,
+  Token Service and Firestore instead of loosening the PWA's. (The dev key was checked: sign-in reaches it.)
+- **Android was never run** — there's no Android SDK on the machine this was built on. Both platform bundles
+  compile, and the Android-specific spots (modal insets, keyboard, edge-to-edge) were reviewed, but test the
+  note field, message composer and modals on an emulator before relying on it.
+- **Tested** on iPhone 17 and iPad Pro 13" simulators in practice mode (full caregiver and family flows), and
+  against `garth-log-dev` for sign-in. Not tested with a real signed-in Firebase account end to end.
