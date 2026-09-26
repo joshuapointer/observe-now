@@ -166,7 +166,8 @@ maestro test e2e/practice-flow.yaml            # iPhone: shift, record, undo, me
 
 ## App Store screenshots
 
-`screenshots/iphone` (1320×2868, 6.9") and `screenshots/ipad` (2064×2752, 13") are made from practice mode with a
+`screenshots/` holds each set named by its App Store slot and size: iPhone 6.9" (1320×2868 and 1290×2796), iPhone
+6.5" (1284×2778) and iPad 13" (2064×2752). They are made from practice mode with a
 believable recent history (`src/lib/store/sample.ts`), no PRACTICE marker, and the app named "Observe Now":
 
 ```sh
