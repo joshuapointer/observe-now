@@ -31,6 +31,28 @@ service cloud.firestore {
     function isCaregiver(p) { return isMember(p) && get(memberDoc(p)).data.role == 'caregiver'; }
     function isOwner(p) { return signedIn() && get(patientDoc(p)).data.ownerUid == request.auth.uid; }
 
+    // Subscriptions. Each log has a 14-day trial from when it was created (stamped with the server's clock), then
+    // needs a paid-up subscription to keep recording. billing is written only by the Cloud Functions (RevenueCat).
+    // Nothing is enforced until config/billing says so, and a lapse only stops new recording: reading, messages,
+    // and deleting your own data always work.
+    function billingEnforced() {
+      return exists(/databases/$(db)/documents/config/billing)
+        && get(/databases/$(db)/documents/config/billing).data.get('enforced', false) == true;
+    }
+    function paidUp(p) {
+      let pd = get(patientDoc(p)).data;
+      return !billingEnforced()
+        || request.time < pd.get('trialStartedAt', timestamp.value(0)) + duration.value(14, 'd')
+        || request.time < pd.get('billing', {}).get('until', timestamp.value(0));
+    }
+    function canRecord(p) { return isCaregiver(p) && paidUp(p); }
+    // Safety comes first: a caregiver can always report a fall and alert family, paid up or not.
+    function isFall() { return 'FL' in request.resource.data.get('codes', []); }
+
+    match /config/{doc} {
+      allow read: if signedIn();
+    }
+
     // "Who do I look after?" list, one per user. It is only a shortcut: real access is always decided by patients/{p}/members.
     match /users/{u}/patients/{p} {
       allow read, write: if signedIn() && u == request.auth.uid;
@@ -52,8 +74,13 @@ service cloud.firestore {
     match /patients/{p} {
       allow read: if isMember(p);
       // Anyone verified (email or phone) can register a patient and becomes its owner.
-      allow create: if verified() && request.resource.data.ownerUid == request.auth.uid;
-      allow update: if isCaregiver(p) && request.resource.data.ownerUid == resource.data.ownerUid;
+      // The trial start, if sent, must be the server's own clock; app versions that don't send it get it stamped by
+      // the stampTrial Cloud Function instead. Billing is never set by an app.
+      allow create: if verified() && request.resource.data.ownerUid == request.auth.uid
+        && (!('trialStartedAt' in request.resource.data) || request.resource.data.trialStartedAt == request.time)
+        && !('billing' in request.resource.data);
+      allow update: if isCaregiver(p) && request.resource.data.ownerUid == resource.data.ownerUid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['billing', 'trialStartedAt']);
       // Deleting an account deletes the logs it owns (everything below is deleted first, then this).
       allow delete: if isOwner(p);
 
@@ -98,17 +125,24 @@ service cloud.firestore {
       // (date-plus-shift-name); nothing in the app or its data model calls these "shifts" any more.
       match /shifts/{s} {
         allow read: if isMember(p);
-        allow create, update: if isCaregiver(p);
+        // The day's own document is scaffolding (created when a caregiver opens the day); updating it records
+        // medicines given and the fall report, and only the fall report is allowed without a subscription.
+        allow create: if isCaregiver(p);
+        allow update: if canRecord(p)
+          || (isCaregiver(p) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fall']));
         allow delete: if isOwner(p);
 
         match /entries/{e} {
           allow read: if isMember(p);
-          allow write: if isCaregiver(p);
+          allow write: if canRecord(p) || (isCaregiver(p) && isFall());
+          allow delete: if isOwner(p);
         }
 
         // Notes marked "keep it off the family feed" live here, so families cannot read them at all.
         match /privateNotes/{e} {
-          allow read, write: if isCaregiver(p);
+          allow read: if isCaregiver(p);
+          allow write: if canRecord(p);
+          allow delete: if isOwner(p);
         }
 
         // Messages both ways: family → caregiver, and caregiver replies (role 'caregiver', caregiver login only).
@@ -121,7 +155,7 @@ service cloud.firestore {
 
         match /alerts/{a} {
           allow read: if isMember(p);
-          allow create: if isCaregiver(p);
+          allow create: if canRecord(p) || (isCaregiver(p) && request.resource.data.get('kind', '') in ['fall', 'fall-note']);
           allow update: if isCaregiver(p) || (
             isMember(p)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['acks'])

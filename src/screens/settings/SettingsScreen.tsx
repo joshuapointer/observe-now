@@ -1,17 +1,21 @@
 // Settings: the care team, what can be recorded, how the app looks, and signing out. Used both as the
 // caregiver's /settings page and as family's /family-settings; rows are mode-aware. Switching people, modes and
 // ending a shift live in the account sheet (the person button in the header).
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { XStack, YStack } from "tamagui";
 
 import { DEMO } from "@/lib/config";
 import { activeCodes } from "@/lib/codes";
+import { manageUrl, PURCHASES_AVAILABLE, restore } from "@/lib/purchases";
 import * as M from "@/lib/model";
 import { deleteAccount, editMeds, openModal, setSetting, signOut } from "@/state/actions";
 import { actingAs, useApp, type Settings } from "@/state/app";
+import { toast } from "@/state/feedback";
 import { useView } from "@/state/view";
-import { ChevronRight, CircleHelp, ListChecks, LogOut, Pill, Stethoscope, Users } from "@/ui/icons";
+import { ChevronRight, CircleHelp, ListChecks, LogOut, Pill, Sparkles, Stethoscope, Users } from "@/ui/icons";
 import { useLayout } from "@/ui/layout";
 import { Button, Card, ListRow, Scroll, Screen, Section, Seg, T } from "@/ui/primitives";
 
@@ -43,6 +47,42 @@ function Toggle({ k, title, detail, last }: { k: "plain" | "nudge" | "wake"; tit
       last={last}
       right={<Seg small title={on ? "On" : "Off"} on={on} onPress={() => setSetting(k, !on)} accessibilityLabel={`${title}: ${on ? "on" : "off"}`} />}
     />
+  );
+}
+
+// The log's subscription, for caregivers: where it stands, and subscribing, managing or restoring it.
+function SubscriptionSection() {
+  const V = useView();
+  const pid = useApp(s => s.pid);
+  const b = V.billing;
+  const date = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+  const detail =
+    b.kind === "trial" ? `Free trial · ${b.daysLeft} ${b.daysLeft === 1 ? "day" : "days"} left`
+    : b.kind === "active" ? (b.willRenew ? `Subscribed · renews ${date(b.until)}` : `Subscribed until ${date(b.until)} · won't renew`)
+    : b.kind === "lapsed" ? "Ended · recording is paused" : "";
+  const manage = async () => {
+    const url = pid ? await manageUrl(pid).catch(() => null) : null;
+    Linking.openURL(url || (Platform.OS === "ios" ? "https://apps.apple.com/account/subscriptions" : "https://play.google.com/store/account/subscriptions"));
+  };
+  const doRestore = async () => {
+    if (!pid) return;
+    const ok = await restore(pid).catch(() => false);
+    toast(ok ? "Subscription restored." : `No subscription found for ${V.ctx.name}'s log.`);
+  };
+  return (
+    <Section title="Subscription">
+      <Card pad={0}>
+        <ListRow
+          icon={Sparkles}
+          title={`${V.ctx.name}'s log`}
+          detail={detail}
+          right={b.kind === "active"
+            ? <Seg small title="Manage" onPress={manage} />
+            : <Seg small title="Subscribe" onPress={() => openModal("paywall")} />}
+        />
+        {PURCHASES_AVAILABLE ? <ListRow title="Restore purchases" detail="Already subscribed on another phone?" onPress={doRestore} right={chevron} last /> : null}
+      </Card>
+    </Section>
   );
 }
 
@@ -78,6 +118,8 @@ export function SettingsScreen() {
               </Card>
             </Section>
           )}
+
+          {isFamily || V.billing.kind === "off" ? null : <SubscriptionSection />}
 
           <Section title="Display">
             <Card pad={0}>

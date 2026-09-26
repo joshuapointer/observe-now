@@ -8,7 +8,7 @@ import { AnimatePresence, Theme, XStack, YStack } from "tamagui";
 
 import * as M from "@/lib/model";
 import type { Entry } from "@/lib/types";
-import { backfillNext, editEntry, openRecord, openThread, pick, quickRecord, viewToday, viewYesterday } from "@/state/actions";
+import { backfillNext, editEntry, openModal, openRecord, openThread, pick, quickRecord, viewToday, viewYesterday } from "@/state/actions";
 import { useApp } from "@/state/app";
 import { canEdit, fromCaregiver, useView, whoBy, type View as ViewModel } from "@/state/view";
 import { NowCard } from "@/screens/family/NowCard";
@@ -21,14 +21,27 @@ import { Button, Card, Screen, Section, Seg, T } from "@/ui/primitives";
 import { Hero } from "./Hero";
 import { Timeline } from "./Timeline";
 
-// The one thing that needs doing, if any: an unfinished fall report beats empty boxes.
+// The one thing that needs doing, if any: a paused log first (nothing else can be recorded), then an unfinished
+// fall report, then empty boxes, then a trial about to end.
 function Attention({ V }: { V: ViewModel }) {
   const f = V.day?.fall;
   const fallOpen = V.isToday && f && !f.filedAt;
   const missed = V.isToday && V.missed.length > 0;
+  const b = V.billing;
+  const trialEnding = b.kind === "trial" && b.daysLeft <= 5;
   return (
     <AnimatePresence>
-      {fallOpen ? (
+      {b.kind === "lapsed" ? (
+        <Theme name="red" key="lapsed">
+          <XStack bg="$color3" rounded={20} p={14} gap={12} items="center" transition="quick" enterStyle={{ opacity: 0, y: -8 }} exitStyle={{ opacity: 0 }}>
+            <YStack flex={1}>
+              <T v="label" color="$color12">Recording is paused</T>
+              <T v="small" color="$color11">The subscription for this log has ended. Everything recorded is safe, and falls can always be reported.</T>
+            </YStack>
+            <Button kind="danger" small title="Renew" onPress={() => openModal("paywall")} />
+          </XStack>
+        </Theme>
+      ) : fallOpen ? (
         <Theme name="red" key="fall">
           <XStack bg="$color3" rounded={20} p={14} gap={12} items="center" transition="quick" enterStyle={{ opacity: 0, y: -8 }} exitStyle={{ opacity: 0 }}>
             <Siren size={24} color="$color11" />
@@ -45,6 +58,16 @@ function Attention({ V }: { V: ViewModel }) {
               <T v="small" color="$color11">{V.missedTimes.slice(0, 4).join(", ")}{V.missedTimes.length > 4 ? "…" : ""}</T>
             </YStack>
             <Button kind="soft" small title={`Fill ${V.missedTimes[0] || ""}`} onPress={backfillNext} />
+          </XStack>
+        </Theme>
+      ) : trialEnding ? (
+        <Theme name="accent" key="trial">
+          <XStack bg="$color3" rounded={20} p={14} gap={12} items="center" transition="quick" enterStyle={{ opacity: 0, y: -8 }} exitStyle={{ opacity: 0 }}>
+            <YStack flex={1}>
+              <T v="label" color="$color12">{`Free trial: ${b.daysLeft} ${b.daysLeft === 1 ? "day" : "days"} left`}</T>
+              <T v="small" color="$color11">Subscribe to keep recording. Family always see it free.</T>
+            </YStack>
+            <Button kind="primary" small title="Subscribe" onPress={() => openModal("paywall")} />
           </XStack>
         </Theme>
       ) : null}

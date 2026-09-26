@@ -1,13 +1,14 @@
 // React Native Firebase (the native iOS/Android SDKs). Which project it talks to comes from the
 // GoogleService-Info.plist that app.config.ts bundles for the build's environment, not from code.
 import NetInfo from "@react-native-community/netinfo";
+import { getApp } from "@react-native-firebase/app";
 import {
   AppleAuthProvider, createUserWithEmailAndPassword, deleteUser, getAuth, getIdToken, onAuthStateChanged, reload,
   sendEmailVerification, sendPasswordResetEmail, signInWithCredential, signInWithEmailAndPassword,
   signInWithPhoneNumber, signOut as fbSignOut, type ConfirmationResult, type User as FbUser,
 } from "@react-native-firebase/auth";
 import {
-  collection, deleteDoc, doc, getDoc as fbGetDoc, getDocs, getFirestore, onSnapshot, setDoc as fbSetDoc,
+  collection, deleteDoc, doc, serverTimestamp, getDoc as fbGetDoc, getDocs, getFirestore, onSnapshot, setDoc as fbSetDoc,
   writeBatch, type SnapshotMetadata,
 } from "@react-native-firebase/firestore";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -115,6 +116,9 @@ export function createFirebaseStore(): DataStore {
     setDoc: (path, data, merge = true) => acked(fbSetDoc(doc(db, path), stripUndefined(data), { merge })),
     remove: path => acked(deleteDoc(doc(db, path))),
     newId: path => doc(collection(db, path)).id,
+    serverTime: () => serverTimestamp(),
+    projectId: getApp().options.projectId || null,
+    idToken: async () => (auth.currentUser ? getIdToken(auth.currentUser) : null),
     batch(ops) {
       const b = writeBatch(db);
       for (const { path, data, merge = true } of ops) b.set(doc(db, path), stripUndefined(data), { merge });

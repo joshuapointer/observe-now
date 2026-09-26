@@ -3,6 +3,7 @@ import { getLocales } from "expo-localization";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 
+import { canRecord } from "@/lib/billing";
 import { SECTIONS, SYSTEM_CODES, alertKind, FALL_QUESTIONS, type Code } from "@/lib/codes";
 import { kv } from "@/lib/kv";
 import * as M from "@/lib/model";
@@ -36,9 +37,11 @@ const byFields = () => { const s = onShift(); return s ? { by: uid(), byName: s.
 const entryPath = (sid: string, key: string) => `${dayPath(sid)}/entries/${key}`;
 const strip = ({ id: _id, sid: _sid, ...rest }: Entry) => rest;
 
-function guard() {
+// safety: a fall (and its report) is always allowed, even when the log's subscription has lapsed.
+function guard(safety = false) {
   if (!isCaregiver() || !onShift()) return false;
   if (get().sid !== M.sidAt(Date.now())) { toast("Go back to today to record."); return false; }
+  if (!safety && !canRecord(V().billing)) { set({ modal: "paywall" }); return false; }
   return true;
 }
 
@@ -81,15 +84,15 @@ export function closeRecord() {
 }
 // One tap on a "used lately" code saves it straight into the current box (with Undo).
 export function quickRecord(code: string) {
+  if (code === "FL") { if (guard(true)) confirmFall(); return; }
   if (!guard()) return;
-  if (code === "FL") { confirmFall(); return; }
   set({ pendingCodes: [code], target: null });
   commit();
 }
 
 export function pick(code: string) {
+  if (code === "FL") { if (guard(true)) confirmFall(); return; }
   if (!guard()) return;
-  if (code === "FL") { confirmFall(); return; }
   const cur = get().pendingCodes;
   set({ pendingCodes: cur.includes(code) ? cur.filter(c => c !== code) : [...cur, code] });
   tap();
@@ -115,7 +118,7 @@ async function confirmFall() {
 }
 
 async function markFall() {
-  if (!guard()) return;
+  if (!guard(true)) return;
   const v = V(), now = Date.now(), S = get();
   if (v.info.start + v.targetIdx * M.SLOT_MS > now) return toast("That time hasn't come yet.");
   const existing = v.d.byKey[v.key], alertId = store().newId(`${dayPath(S.sid)}/alerts`);
@@ -777,7 +780,7 @@ export async function addPatient(nameIn: string) {
   try {
     // This account becomes the shared caregiver login for the patient; caregivers are added by name next.
     await store().batch([
-      { path: `patients/${pid}`, data: { name: pname, careSetting: "Home, 24-hour care", pronouns: M.PRONOUNS, meds: [], ownerUid: uid(), createdAt: Date.now() }, merge: false },
+      { path: `patients/${pid}`, data: { name: pname, careSetting: "Home, 24-hour care", pronouns: M.PRONOUNS, meds: [], ownerUid: uid(), createdAt: Date.now(), trialStartedAt: store().serverTime() }, merge: false },
       { path: `patients/${pid}/members/${uid()}`, data: { role: "caregiver", name: "Care device", relation: "", detail: "", digestOnly: false, owner: true }, merge: false },
       { path: `users/${uid()}/patients/${pid}`, data: { name: pname, role: "caregiver", at: Date.now() }, merge: false },
     ]);

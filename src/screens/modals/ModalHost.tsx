@@ -16,6 +16,7 @@ import { actingAs, useApp, type CgForm, type EditForm, type MedForm } from "@/st
 import { msgWho, notAsked, useView, type View as ComputedView } from "@/state/view";
 import { CaregiverForm } from "@/screens/gate/CaregiverForm";
 import { Intro } from "@/screens/intro/Intro";
+import { Paywall } from "@/screens/paywall/Paywall";
 import { RecordSheet } from "@/screens/record/RecordSheet";
 import { ChatBubble } from "@/ui/ChatBubble";
 import { ArrowLeftRight, Eye, Plus, Settings, UserRound, Users } from "@/ui/icons";
@@ -389,6 +390,7 @@ export function ModalHost() {
   return (
     <>
       <RecordSheet open={modal === "record"} />
+      <Paywall open={modal === "paywall"} />
       <Sheet open={modal === "help"} onClose={closeModal} title={helpTitle}>
         <Steps items={helpItems} />
         <Button kind="primary" big title="Got it" onPress={closeModal} />

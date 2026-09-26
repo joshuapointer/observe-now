@@ -46,6 +46,8 @@ export function sync() {
       // recovers. The confirmed snapshot follows moments later; act on that one.
       if (!meta.pending) onLinks();
     }, () => { set({ links: [] }); onLinks(); }));
+    // Whether subscriptions are switched on (the rules read the same document).
+    add("config:billing", () => st.watchDoc<{ enforced?: boolean }>("config/billing", d => set({ billingEnforced: !!d?.enforced }), () => {}));
     if (S.pid) {
       const pid = S.pid, pp = PP();
       add(`member:${pid}`, () => st.watchDoc<Member>(`${pp}/members/${uid()}`, (m, meta) => {

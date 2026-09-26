@@ -20,6 +20,7 @@ export type ModalId =
   | "record" // the record sheet: what's happening, for the current box or the one being filled in
   | "compose" // family: write a message, or a reply to the thread in replyTo
   | "account" // you, this device, the shift and switching modes
+  | "paywall" // subscribe to keep recording for this log
   | null;
 
 export type MedForm = { idx: number; name: string; dose: string; sched: string; dueAt: string; asNeeded: boolean };
@@ -84,6 +85,7 @@ export type AppState = {
   revealed: Record<string, boolean>;
   trends: Trends | null;
 
+  billingEnforced: boolean; // config/billing.enforced: subscriptions are switched on
   toast: string;
   undo: (() => Promise<unknown>) | null;
   status: SyncStatus;
@@ -108,7 +110,7 @@ export const useApp = create<AppState>(() => ({
   threadRead: {},
   lastVisit: 0,
   revealed: {},
-  toast: "", undo: null,
+  toast: "", undo: null, billingEnforced: false,
   status: { online: true, pending: 0, lastSync: 0 },
 }));
 

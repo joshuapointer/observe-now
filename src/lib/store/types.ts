@@ -34,6 +34,10 @@ export interface DataStore {
   setDoc(path: string, data: Record<string, unknown>, merge?: boolean): Promise<void>;
   remove(path: string): Promise<void>;
   newId(path: string): string;
+  serverTime(): unknown; // a value the server replaces with its own clock when the write lands
+  // For calling our Cloud Functions: the Firebase project and a fresh ID token for the signed-in account.
+  projectId: string | null;
+  idToken(): Promise<string | null>;
   batch(ops: Op[]): Promise<void>;
   removeMany(paths: string[]): Promise<void>; // deletes in batches; used to delete a whole log
   deleteUser(): Promise<void>; // the signed-in account itself; rejects with auth/requires-recent-login if it's been a while

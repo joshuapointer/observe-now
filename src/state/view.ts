@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { alertKind, type AlertKind } from "@/lib/codes";
+import { billingState } from "@/lib/billing";
 import * as M from "@/lib/model";
 import type { Ctx, DayData, Entry, Message } from "@/lib/types";
 import { actingAs, useApp, useNow, type AppState } from "./app";
@@ -15,11 +16,11 @@ export const fromCaregiver = (n: Message) => n.role === "caregiver";
 // Everything the screens need, computed once per state change (port of the PWA's compute()).
 // The fields compute() reads. useView subscribes to just these, so typing a note, a toast or a PIN key doesn't
 // recompute and re-render every screen that shows the log.
-type ViewInput = Pick<AppState, "sid" | "data" | "patient" | "members" | "presence" | "reg" | "target" | "pain" | "pendingCodes" | "msgReadAt" | "pid" | "threadRead" | "roster" | "settings" | "user" | "member" | "viewAs">;
+type ViewInput = Pick<AppState, "sid" | "data" | "patient" | "members" | "presence" | "reg" | "target" | "pain" | "pendingCodes" | "msgReadAt" | "pid" | "threadRead" | "roster" | "settings" | "user" | "member" | "viewAs" | "billingEnforced">;
 const pickInput = (S: AppState): ViewInput => ({
   sid: S.sid, data: S.data, patient: S.patient, members: S.members, presence: S.presence, reg: S.reg, target: S.target, pain: S.pain,
   pendingCodes: S.pendingCodes, msgReadAt: S.msgReadAt, pid: S.pid, threadRead: S.threadRead, roster: S.roster, settings: S.settings, user: S.user,
-  member: S.member, viewAs: S.viewAs,
+  member: S.member, viewAs: S.viewAs, billingEnforced: S.billingEnforced,
 });
 
 export function compute(S: ViewInput, now: number) {
@@ -92,6 +93,7 @@ export function compute(S: ViewInput, now: number) {
     missed, missedTimes, recents, pendingAlertKind, messages, threads, unreadIds, unreadMsgs: unreadIds.size, msgReadAt,
     now, info, D, PD, day, ctx, d, key, targetIdx, latest, alerts, members, family, live, careSeen, careActive, meds, onShift, roster: S.roster || [],
     feed, plain: S.settings.plain, isToday, boxLeftMs, boxProgress,
+    billing: billingState(S.patient, now, S.billingEnforced),
     isOwner: !!S.patient && S.patient.ownerUid === S.user?.uid,
     familyCount: family.length,
   };

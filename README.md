@@ -164,6 +164,34 @@ maestro test e2e/practice-flow.yaml            # iPhone: shift, record, undo, me
                                                # settings, preview, fall report, then family: alert, reply
 ```
 
+## Subscriptions
+
+One subscription per care log (family never pay): a 14-day free trial from when the log is created, then monthly
+or yearly through the App Store or Google Play, managed by RevenueCat. Each log is its own RevenueCat customer,
+`log_<patient id>`, so the subscription belongs to the log and every caregiver device sees it.
+
+- **The server decides.** `patients/{id}.billing` is written only by Cloud Functions (`functions/index.js`):
+  `revenuecatWebhook` (RevenueCat → on every purchase, renewal, cancellation, refund) and `syncBilling` (the app,
+  right after a purchase or restore). `stampTrial` stamps the trial start on logs from app versions that don't.
+- **The rules enforce it**, but only once `config/billing` has `enforced: true` (set it in the Firestore console).
+  A lapsed log keeps everything readable, messages working and deletion possible; only new recording stops, and
+  **a fall can always be reported**.
+- **The app** shows a trial or renewal card on Now, a Subscription section in Settings, and the paywall
+  (`src/screens/paywall`). Purchases are off until the RevenueCat public keys are set: `EXPO_PUBLIC_RC_APPLE_KEY`
+  and `EXPO_PUBLIC_RC_GOOGLE_KEY` in each `eas.json` build profile's `env`.
+
+Setup, once per Firebase project (dev, then prod), after the project is on the Blaze plan:
+
+```sh
+npx firebase functions:secrets:set REVENUECAT_SECRET_KEY --project prod    # RevenueCat secret API key (sk_…)
+npx firebase functions:secrets:set REVENUECAT_WEBHOOK_AUTH --project prod  # any long random string
+npx firebase deploy --only functions --project prod
+```
+
+Then in RevenueCat: add the webhook `https://us-central1-<project>.cloudfunctions.net/revenuecatWebhook` with that
+same string as its Authorization header; an entitlement `care_log`; an offering with monthly and annual packages.
+In App Store Connect and Play Console: the subscription products (one subscription group), linked in RevenueCat.
+
 ## App Store screenshots
 
 `screenshots/` holds each set named by its App Store slot and size: iPhone 6.9" (1320×2868 and 1290×2796), iPhone
