@@ -68,7 +68,8 @@
     "lint": "expo lint",
     "test": "jest",
     "test:rules": "firebase emulators:exec --only firestore --project demo-rules \"vitest run --root firebase\"",
-    "deploy:rules": "firebase deploy --only firestore --project"
+    "deploy:rules": "firebase deploy --only firestore --project",
+    "metadata": "EXPO_PUBLIC_APP_ENV=prod npx eas-cli@latest metadata:push --profile production"
   },
   "private": true,
   "jest": {
