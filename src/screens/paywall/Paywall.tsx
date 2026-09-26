@@ -79,7 +79,11 @@ export function Paywall({ open }: { open: boolean }) {
   useEffect(() => {
     if (!open || !pid || !PURCHASES_AVAILABLE) return;
     let live = true;
-    loadPlans(pid).then(p => { if (live) { setPlans(p); setChosen(p[0]?.id || null); } }, e => { if (live) setError(String(e?.message || e)); });
+    const unavailable = "Plans can't be shown right now. Check the connection and try again in a moment.";
+    loadPlans(pid).then(
+      p => { if (live) { setPlans(p); setChosen(p[0]?.id || null); if (!p.length) setError(unavailable); } },
+      e => { console.warn("loadPlans", e); if (live) setError(unavailable); },
+    );
     return () => { live = false; };
   }, [open, pid]);
 
