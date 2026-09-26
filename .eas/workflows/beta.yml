@@ -1,6 +1,6 @@
 # Every push to `beta` for "Observe Now Beta" (dev backend): a new native build goes to TestFlight.
 # If nothing native changed since the last build (same fingerprint), it publishes an over-the-air update to the
-# "beta" channel instead, which installed apps download on their next launch. iOS only for now.
+# "beta" channel instead, which installed apps download on their next launch. Android is below.
 name: Beta to TestFlight
 
 on:
@@ -19,6 +19,7 @@ jobs:
       platform: ios
       profile: beta
       fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+      wait_for_in_progress: true
 
   build_ios:
     type: build
@@ -42,4 +43,14 @@ jobs:
     environment: preview
     params:
       platform: ios
+      channel: beta
+
+  # Android installs come from Firebase App Distribution (the beta-apk build, made by hand). Updates only reach
+  # builds with the same fingerprint, so publishing every time is safe: after a native change it waits for a new APK.
+  update_android:
+    type: update
+    needs: [fingerprint]
+    environment: preview
+    params:
+      platform: android
       channel: beta
