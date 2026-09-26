@@ -7,24 +7,18 @@
       "developmentClient": true,
       "distribution": "internal",
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_APP_ENV": "dev",
-        "EXPO_PUBLIC_RC_APPLE_KEY": "appl_UWgfXlgbpjYRBpgBsLFoAoNetnA"
-      }
+      "channel": "development",
+      "environment": "development"
     },
     "beta": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_APP_ENV": "beta",
-        "EXPO_PUBLIC_RC_APPLE_KEY": "appl_UWgfXlgbpjYRBpgBsLFoAoNetnA"
-      }
+      "channel": "beta",
+      "environment": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_APP_ENV": "prod",
-        "EXPO_PUBLIC_RC_APPLE_KEY": "appl_UWgfXlgbpjYRBpgBsLFoAoNetnA"
-      }
+      "channel": "production",
+      "environment": "production"
     },
     "beta-apk": {
       "extends": "beta",

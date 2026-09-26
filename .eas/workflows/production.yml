@@ -1,5 +1,7 @@
-# Every push to `main` builds "Observe Now" (prod backend) and uploads it to App Store Connect. It lands in
-# TestFlight; releasing it to the App Store is still a manual step there.
+# Every push to `main` for "Observe Now" (prod backend): a new native build goes to App Store Connect, where
+# releasing it to the App Store is still a manual step.
+# If nothing native changed since the last build (same fingerprint), it publishes an over-the-air update to the
+# "production" channel instead, which installed apps download on their next launch. iOS only for now.
 name: Production to App Store Connect
 
 on:
@@ -7,8 +9,22 @@ on:
     branches: ['main']
 
 jobs:
+  fingerprint:
+    type: fingerprint
+    environment: production
+
+  get_ios_build:
+    type: get-build
+    needs: [fingerprint]
+    params:
+      platform: ios
+      profile: production
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+
   build_ios:
     type: build
+    needs: [get_ios_build]
+    if: ${{ !needs.get_ios_build.outputs.build_id }}
     params:
       platform: ios
       profile: production
@@ -19,3 +35,12 @@ jobs:
     params:
       build_id: ${{ needs.build_ios.outputs.build_id }}
       profile: production
+
+  update_ios:
+    type: update
+    needs: [get_ios_build]
+    if: ${{ needs.get_ios_build.outputs.build_id }}
+    environment: production
+    params:
+      platform: ios
+      channel: production

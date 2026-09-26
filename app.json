@@ -4,6 +4,12 @@
     "slug": "observe-now",
     "scheme": "observenow",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c57472d1-cb40-4b44-af2d-de6aec8dae03"
+    },
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
