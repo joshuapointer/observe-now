@@ -1,37 +1,76 @@
 {
-  "fill" : {
-    "solid" : "display-p3:0.33356,0.27180,0.57185,1.00000"
+  "fill": {
+    "solid": "display-p3:0.33356,0.27180,0.57185,1.00000"
   },
-  "groups" : [
+  "groups": [
     {
-      "layers" : [
+      "layers": [
         {
-          "blend-mode" : "multiply",
-          "image-name" : "artwork.jpeg",
-          "name" : "artwork",
-          "position" : {
-            "scale" : 0.94,
-            "translation-in-points" : [
+          "blend-mode": "screen",
+          "hidden": false,
+          "image-name": "Firefly-6.png",
+          "name": "Firefly-6",
+          "position": {
+            "scale": 0.66,
+            "translation-in-points": [
               0,
               0
             ]
           }
+        },
+        {
+          "blend-mode": "overlay",
+          "hidden": false,
+          "image-name": "Firefly.png",
+          "name": "Firefly",
+          "position": {
+            "scale": 0.900176,
+            "translation-in-points": [
+              -4.860000000000014,
+              1.2149999999999181
+            ]
+          }
+        },
+        {
+          "blend-mode": "multiply",
+          "image-name": "Firefly-3 3.png",
+          "name": "Firefly-3 3",
+          "position": {
+            "scale": 0.999763,
+            "translation-in-points": [
+              6.350000000000023,
+              23.75
+            ]
+          }
+        },
+        {
+          "blend-mode": "overlay",
+          "hidden": false,
+          "image-name": "Firefly-5.png",
+          "name": "Firefly-5",
+          "position": {
+            "scale": 0.999865,
+            "translation-in-points": [
+              4.21000000000015,
+              25.809999999999945
+            ]
+          }
         }
       ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
       },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.3
+      "translucency": {
+        "enabled": true,
+        "value": 0.3
       }
     }
   ],
-  "supported-platforms" : {
-    "circles" : [
+  "supported-platforms": {
+    "circles": [
       "watchOS"
     ],
-    "squares" : "shared"
+    "squares": "shared"
   }
 }

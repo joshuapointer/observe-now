@@ -23,7 +23,7 @@
     "android": {
       "package": "com.joshpointer.observenow",
       "adaptiveIcon": {
-        "backgroundColor": "#433882",
+        "backgroundColor": "#5b4b97",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
