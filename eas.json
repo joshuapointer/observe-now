@@ -8,19 +8,22 @@
       "distribution": "internal",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_APP_ENV": "dev"
+        "EXPO_PUBLIC_APP_ENV": "dev",
+        "EXPO_PUBLIC_RC_APPLE_KEY": "appl_UWgfXlgbpjYRBpgBsLFoAoNetnA"
       }
     },
     "beta": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_APP_ENV": "beta"
+        "EXPO_PUBLIC_APP_ENV": "beta",
+        "EXPO_PUBLIC_RC_APPLE_KEY": "appl_UWgfXlgbpjYRBpgBsLFoAoNetnA"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_APP_ENV": "prod"
+        "EXPO_PUBLIC_APP_ENV": "prod",
+        "EXPO_PUBLIC_RC_APPLE_KEY": "appl_UWgfXlgbpjYRBpgBsLFoAoNetnA"
       }
     },
     "beta-apk": {
