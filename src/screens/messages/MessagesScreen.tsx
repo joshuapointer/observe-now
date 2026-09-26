@@ -1,55 +1,61 @@
-// Caregiver chat: conversations on the left (or full-width list on phone), the open one on the right
-// (or full-width, on top of the list, on phone). Port of the PWA's messagesView (views.js).
-import Ionicons from "@expo/vector-icons/Ionicons";
+// Messages, for both sides: conversations on the left (or a full-width list on a phone), the open one on the
+// right (or on top of the list, on a phone). Your side's messages sit on the right in blue.
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, View, type ScrollView } from "react-native";
+import { FlatList, type ScrollView } from "react-native";
+import { XStack, YStack } from "tamagui";
 
-import * as M from "@/lib/model";
 import type { Message } from "@/lib/types";
 import { markThreadRead, openThread, openThreadId, sendNew, sendReply, setDraft } from "@/state/actions";
 import { actingAs, useApp } from "@/state/app";
 import { setOnNotes } from "@/state/session";
 import { fromCaregiver, msgWho, msgWhen, useView, type Thread, type View as ViewState } from "@/state/view";
-import { RAIL_WIDTH, useLayout } from "@/ui/layout";
 import { ChatBubble } from "@/ui/ChatBubble";
-import { Button, Field, KeyboardArea, Scroll, Screen, T } from "@/ui/primitives";
-import { useTheme } from "@/ui/theme";
+import { ChevronLeft, Pencil, Send } from "@/ui/icons";
+import { RAIL_WIDTH, useLayout } from "@/ui/layout";
+import { Button, Empty, Field, KeyboardArea, Scroll, Screen, T } from "@/ui/primitives";
 
 const unreadIn = (th: Thread, unreadIds: Set<string>) => [th.root, ...th.replies].filter(n => unreadIds.has(n.id)).length;
 
 function ThreadRow({ th, V, selected, onPress }: { th: Thread; V: ViewState; selected: boolean; onPress: () => void }) {
-  const t = useTheme();
   const lastMsg = th.replies[th.replies.length - 1] || th.root;
   const unread = unreadIn(th, V.unreadIds);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${msgWho(th.root)}. ${th.root.text}${unread ? `. ${unread} new` : ""}`}
+    <XStack
+      role="button"
+      aria-selected={selected}
+      aria-label={`${msgWho(th.root)}. ${lastMsg.text}${unread ? `. ${unread} new` : ""}`}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.threadItem,
-        { borderBottomColor: t.c.line, backgroundColor: selected ? t.c.press : "transparent" },
-        pressed && { opacity: 0.85 },
-      ]}
+      mx={12}
+      my={4}
+      p={14}
+      gap={12}
+      rounded={20}
+      bg={selected ? "$accent3" : "$card"}
+      items="center"
+      pressStyle={{ scale: 0.985, bg: "$color3" }}
+      transition="quick"
     >
-      <View style={styles.threadTop}>
-        <T v="label" numberOfLines={1} style={{ flex: 1 }}>{msgWho(th.root)}</T>
-        <T v="small" color={t.c.mute}>{msgWhen(lastMsg, V)}</T>
-      </View>
-      <T numberOfLines={2} weight={unread ? "bold" : undefined}>{th.root.text}</T>
-      <View style={styles.threadFoot}>
-        <T v="small" color={t.c.mute} style={{ flex: 1 }}>
-          {th.replies.length ? `${th.replies.length} repl${th.replies.length === 1 ? "y" : "ies"} · last from ${lastMsg.who}` : "No replies yet"}
-        </T>
-        {unread ? (
-          <View style={[styles.dot, { backgroundColor: t.c.danger, borderRadius: t.colorful ? t.r.pill : 0 }]}>
-            <T v="small" weight="black" color={t.c.onDanger}>{`${unread} new`}</T>
-          </View>
-        ) : null}
-      </View>
-    </Pressable>
+      <YStack width={44} height={44} rounded={22} bg={fromCaregiver(th.root) ? "$accent4" : "$green4"} items="center" justify="center">
+        <T weight="black" color={fromCaregiver(th.root) ? "$accent11" : "$green11"}>{(th.root.who || "?").slice(0, 1).toUpperCase()}</T>
+      </YStack>
+      <YStack flex={1} gap={2}>
+        <XStack items="center" gap={8}>
+          <T v="label" numberOfLines={1} flex={1}>{msgWho(th.root)}</T>
+          <T v="small" fontSize={12}>{msgWhen(lastMsg, V)}</T>
+        </XStack>
+        <XStack items="center" gap={8}>
+          <T numberOfLines={2} fontSize={15} lineHeight={20} flex={1} weight={unread ? "bold" : "regular"} color={unread ? "$color12" : "$color11"}>
+            {th.replies.length ? `${lastMsg.who}: ${lastMsg.text}` : th.root.text}
+          </T>
+          {unread ? (
+            <YStack minW={22} height={22} rounded={11} px={6} bg="$red9" items="center" justify="center">
+              <T fontSize={12} lineHeight={15} weight="black" color="$white1">{unread}</T>
+            </YStack>
+          ) : null}
+        </XStack>
+      </YStack>
+    </XStack>
   );
 }
 
@@ -61,29 +67,27 @@ function Bubble({ n, V, family }: { n: Message; V: ViewState; family: boolean })
 }
 
 export function MessagesScreen() {
-  const t = useTheme();
   const { isTablet } = useLayout();
   const V = useView();
   const thread = useApp(s => s.thread);
   const draftReply = useApp(s => s.drafts.reply || "");
   const draftNew = useApp(s => s.drafts.newmsg || "");
-  const onShiftName = M.firstName(V.onShift?.name);
   const family = useApp(s => actingAs(s)) === "family";
-  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(thread === "new");
   const scrollRef = useRef<ScrollView>(null);
 
-  // Keeps the currently open conversation selected (and read) whenever this screen has focus, and marks a
-  // reply as read the instant it arrives while the conversation is open — mirrors the PWA's tab(id) switch.
-  // On a phone the conversation is only on screen once it's been opened; showing the list alone must not mark
-  // anything read, or the unread badge would clear for messages nobody has seen.
+  // Keeps the open conversation selected (and read) whenever this screen has focus, and marks a reply read the
+  // instant it arrives while the conversation is open. On a phone the conversation is only on screen once it's
+  // been opened; the list alone must not mark anything read, or the badge would clear for messages nobody saw.
   const chatVisible = isTablet || phoneOpen;
   useFocusEffect(
     useCallback(() => {
+      if (thread === "new" && !isTablet) setPhoneOpen(true);
       if (!chatVisible) return;
       if (thread !== "new") openThread(openThreadId());
       setOnNotes(() => markThreadRead(thread === "new" ? null : openThreadId()));
       return () => setOnNotes(null);
-    }, [thread, chatVisible]),
+    }, [thread, chatVisible, isTablet]),
   );
 
   const sel = thread === "new" ? null : V.threads.find(x => x.root.id === thread) || V.threads[0] || null;
@@ -92,96 +96,90 @@ export function MessagesScreen() {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, [sel?.root.id, sel?.replies.length]);
 
-  const openItem = (id: string) => {
-    openThread(id);
-    if (!isTablet) setPhoneOpen(true);
-  };
-  const openNew = () => {
-    openThread("new");
-    if (!isTablet) setPhoneOpen(true);
-  };
-  const back = () => setPhoneOpen(false);
+  const openItem = (id: string) => { openThread(id); if (!isTablet) setPhoneOpen(true); };
+  const openNew = () => { openThread("new"); if (!isTablet) setPhoneOpen(true); };
 
   const showList = isTablet || !phoneOpen;
   const showChat = isTablet || phoneOpen;
   const send = sel ? sendReply : sendNew;
+  const other = family ? V.ctx.caregiver : "family";
+  const draft = sel ? draftReply : draftNew;
 
   return (
-    <Screen style={{ flexDirection: isTablet ? "row" : "column" }}>
+    <Screen flexDirection={isTablet ? "row" : "column"}>
       {showList ? (
-        <View
-          style={[
-            styles.listCol,
-            isTablet && { width: RAIL_WIDTH, borderRightWidth: t.colorful ? StyleSheet.hairlineWidth : 2, borderRightColor: t.colorful ? t.c.line : t.c.edge },
-          ]}
-        >
-          <View style={[styles.listHead, { borderBottomColor: t.c.line }]}>
-            <Button title="New message" kind="primary" onPress={openNew} />
-          </View>
+        <YStack flex={isTablet ? undefined : 1} width={isTablet ? RAIL_WIDTH : undefined} borderRightWidth={isTablet ? 1 : 0} borderRightColor="$color4">
+          <XStack px={16} pt={4} pb={8}>
+            <Button kind="soft" icon={Pencil} title={`New message to ${other}`} onPress={openNew} grow />
+          </XStack>
           <FlatList
             data={V.threads}
             keyExtractor={x => x.root.id}
             extraData={sel?.root.id}
-            renderItem={({ item }) => <ThreadRow th={item} V={V} selected={sel === item} onPress={() => openItem(item.root.id)} />}
-            ListEmptyComponent={<T v="small" color={t.c.mute} style={{ padding: 16 }}>No conversations yet.</T>}
+            contentContainerStyle={{ paddingBottom: 16 }}
+            renderItem={({ item }) => <ThreadRow th={item} V={V} selected={isTablet && sel === item} onPress={() => openItem(item.root.id)} />}
+            ListEmptyComponent={<Empty title="No messages yet" body={`Start a conversation with ${other}. They can reply here.`} />}
           />
-        </View>
+        </YStack>
       ) : null}
       {showChat ? (
         <KeyboardArea style={{ flex: 1 }}>
-          {!isTablet ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="All messages" onPress={back} style={styles.backRow} hitSlop={8}>
-              <Ionicons name="chevron-back" size={20} color={t.c.accentInk} />
-              <T v="label" color={t.c.accentInk}>All messages</T>
-            </Pressable>
-          ) : null}
-          <View style={[styles.bar, { backgroundColor: t.colorful ? t.c.panel : t.c.chrome }]}>
-            <T v="label" color={t.colorful ? t.c.ink : t.c.onChrome} numberOfLines={1} style={{ flex: 1 }}>
-              {sel ? `${sel.root.who} started this conversation · ${msgWhen(sel.root, V)}` : family ? `New message to ${V.ctx.caregiver}` : "New message to family"}
+          <XStack items="center" gap={6} px={isTablet ? 16 : 6} py={6} borderBottomWidth={1} borderBottomColor="$color4">
+            {!isTablet ? (
+              <XStack role="button" aria-label="All messages" onPress={() => setPhoneOpen(false)} hitSlop={8} items="center" px={6} height={40} pressStyle={{ opacity: 0.6 }}>
+                <ChevronLeft size={24} color="$accent11" />
+                <T v="label" color="$accent11">All</T>
+              </XStack>
+            ) : null}
+            <T v="label" numberOfLines={1} flex={1} center={!isTablet} pr={isTablet ? 0 : 50}>
+              {sel ? msgWho(sel.root) : `New message to ${other}`}
             </T>
-          </View>
+          </XStack>
           {sel ? (
-            <Scroll ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.chatlog}>
+            <Scroll ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 10, flexGrow: 1, justifyContent: "flex-end" }}>
               <Bubble n={sel.root} V={V} family={family} />
               {sel.replies.map(r => <Bubble key={r.id} n={r} V={V} family={family} />)}
             </Scroll>
           ) : (
-            <View style={{ flex: 1, padding: 24 }}>
-              <T color={t.c.mute}>
+            <YStack flex={1} p={24} justify="flex-end">
+              <T color="$color11" center>
                 {family
-                  ? `Write something for ${V.ctx.caregiver}. It shows in the care app's Messages, and they can reply.`
-                  : "Write something for family to read. They see it in their list of updates, and can reply."}
+                  ? `${V.ctx.caregiver} sees this in the care app's Messages and can reply.`
+                  : "Family see this in their updates and can reply."}
               </T>
-            </View>
+            </YStack>
           )}
-          <View style={[styles.composeRow, { borderTopColor: t.colorful ? t.c.line : t.c.edge, borderTopWidth: t.colorful ? StyleSheet.hairlineWidth : 2 }]}>
-            <Field
-              style={{ flex: 1 }}
-              value={sel ? draftReply : draftNew}
-              onChangeText={v => setDraft(sel ? "reply" : "newmsg", v)}
-              placeholder={family ? (sel ? "Write your reply…" : `Write to ${V.ctx.caregiver}…`) : sel ? `Reply as ${onShiftName}…` : `Write to family as ${onShiftName}…`}
-              accessibilityLabel={sel ? "Reply" : "New message"}
-              autoCapitalize="sentences"
-              returnKeyType="send"
-              onSubmitEditing={send}
-            />
-            <Button title="Send" kind="primary" small onPress={send} />
-          </View>
+          <XStack items="flex-end" gap={8} px={12} pt={8} pb={10} borderTopWidth={1} borderTopColor="$color4">
+            <YStack flex={1}>
+              <Field
+                value={draft}
+                onChangeText={v => setDraft(sel ? "reply" : "newmsg", v)}
+                placeholder={sel ? "Reply…" : `Write to ${other}…`}
+                accessibilityLabel={sel ? "Reply" : "New message"}
+                autoCapitalize="sentences"
+                returnKeyType="send"
+                onSubmitEditing={send}
+                style={{ borderRadius: 24 }}
+              />
+            </YStack>
+            <YStack
+              role="button"
+              aria-label="Send"
+              onPress={send}
+              width={50}
+              height={50}
+              rounded={25}
+              bg={draft.trim() ? "$blue9" : "$color5"}
+              items="center"
+              justify="center"
+              transition="quick"
+              pressStyle={{ scale: 0.9 }}
+            >
+              <Send size={22} color="$white1" />
+            </YStack>
+          </XStack>
         </KeyboardArea>
       ) : null}
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  listCol: { flex: 1 },
-  listHead: { padding: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  threadItem: { paddingHorizontal: 16, paddingVertical: 12, gap: 4, borderBottomWidth: StyleSheet.hairlineWidth },
-  threadTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  threadFoot: { flexDirection: "row", alignItems: "center", gap: 8 },
-  dot: { paddingHorizontal: 8, paddingVertical: 1 },
-  backRow: { flexDirection: "row", alignItems: "center", gap: 4, padding: 12, alignSelf: "flex-start" },
-  bar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10 },
-  chatlog: { padding: 16, gap: 10, flexGrow: 1, justifyContent: "flex-end" },
-  composeRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12 },
-});

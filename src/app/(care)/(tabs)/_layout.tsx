@@ -1,52 +1,24 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router/tabs";
-import { Platform } from "react-native";
 
 import { useView } from "@/state/view";
-import { useLayout } from "@/ui/layout";
-import { CareHeader } from "@/ui/shell";
-import { useTheme } from "@/ui/theme";
-
-type Icon = keyof typeof Ionicons.glyphMap;
-
-// [route, tab label, page title, icon]
-const TABS: [string, string, string, Icon][] = [
-  ["record", "Record", "What's happening now", "create-outline"],
-  ["messages", "Messages", "Messages with family", "chatbubbles-outline"],
-  ["notes", "Notes & medicines", "Notes and medicines", "medkit-outline"],
-  ["week", "This week", "The last seven nights", "moon-outline"],
-  ["settings", "Settings", "Settings", "settings-outline"],
-];
+import { House, MessagesSquare, Pill } from "@/ui/icons";
+import { AppHeader } from "@/ui/shell";
+import { TabBar, type TabItem } from "@/ui/TabBar";
+import { useColors } from "@/ui/theme";
 
 export default function CareTabs() {
-  const t = useTheme(), V = useView(), { isTablet } = useLayout();
+  const V = useView(), c = useColors();
+  const items: TabItem[] = [
+    { name: "record", label: "Now", icon: House },
+    { name: "messages", label: "Messages", icon: MessagesSquare, badge: V.unreadMsgs },
+    { name: "care", label: "Care", icon: Pill },
+  ];
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: t.c.accentInk,
-        tabBarInactiveTintColor: t.c.mute,
-        tabBarStyle: { backgroundColor: t.c.ground, borderTopColor: t.colorful ? t.c.line : t.c.edge, borderTopWidth: t.colorful ? 1 : 2 },
-        tabBarLabelStyle: { ...t.font("bold"), fontSize: isTablet ? 14 : 11 },
-        // Android only: there the keyboard pushes the tab bar up. On iOS the keyboard covers it anyway, and hiding
-        // it could leave it missing after the iPad keyboard's own dismiss key.
-        tabBarHideOnKeyboard: Platform.OS === "android",
-        sceneStyle: { backgroundColor: t.c.bg },
-      }}
+      tabBar={p => <TabBar {...p} items={items} />}
+      screenOptions={{ header: () => <AppHeader />, sceneStyle: { backgroundColor: c.page }, animation: "shift" }}
     >
-      {TABS.map(([name, label, title, icon]) => (
-        <Tabs.Screen
-          key={name}
-          name={name}
-          options={{
-            title: label,
-            tabBarLabel: !isTablet && name === "notes" ? "Notes" : label,
-            tabBarIcon: ({ color, size }) => <Ionicons name={icon} color={color} size={size} />,
-            tabBarBadge: name === "messages" && V.unreadMsgs ? (V.unreadMsgs > 9 ? "9+" : V.unreadMsgs) : undefined,
-            tabBarBadgeStyle: { backgroundColor: t.c.danger },
-            header: () => <CareHeader title={title} record={name === "record"} />,
-          }}
-        />
-      ))}
+      {items.map(it => <Tabs.Screen key={it.name} name={it.name} options={{ title: it.label }} />)}
     </Tabs>
   );
 }

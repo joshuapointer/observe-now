@@ -12,12 +12,15 @@ export type Settings = {
   nudge: boolean; // countdown to the next entry
   wake: boolean; // keep the screen on (caregiver device)
   theme: "auto" | "light" | "night";
-  style: "colorful" | "classic";
   clock: "auto" | "12" | "24";
 };
 
 export type ModalId =
-  | "help" | "welcome" | "meds" | "details" | "caregivers" | "people" | "edit-entry" | null;
+  | "help" | "welcome" | "meds" | "details" | "caregivers" | "people" | "edit-entry"
+  | "record" // the record sheet: what's happening, for the current box or the one being filled in
+  | "compose" // family: write a message, or a reply to the thread in replyTo
+  | "account" // you, this device, the shift and switching modes
+  | null;
 
 export type MedForm = { idx: number; name: string; dose: string; sched: string; dueAt: string; asNeeded: boolean };
 export type CodeForm = { id: string | null; short: string; abbr: string; long: string; section: string };
@@ -65,8 +68,6 @@ export type AppState = {
   place: string;
   pain: string;
   details: boolean;
-  openSection: string | null;
-  stripCollapsed: boolean;
 
   drafts: Drafts;
   medForm: MedForm | null;
@@ -88,14 +89,14 @@ export type AppState = {
   status: SyncStatus;
 };
 
-const DEFAULT_SETTINGS: Settings = { plain: true, nudge: true, wake: true, theme: "auto", style: "colorful", clock: "auto" };
+const DEFAULT_SETTINGS: Settings = { plain: true, nudge: true, wake: true, theme: "auto", clock: "auto" };
 
 export const initialSession = (): Partial<AppState> => ({
   pid: null, links: undefined, pendingInvites: undefined, legacyChecked: false, pickerOpen: false, pickerFor: null, addingPatient: false, viewAs: null,
   data: {}, member: undefined, patient: undefined, roster: undefined, members: [], presence: [], reg: DEFAULT_REGISTRY,
   pinFor: null, pin: "", pinError: "", cgForm: null, edit: null, codeForm: null, medForm: null, thread: null, replyTo: null,
-  pendingCodes: [], target: null, place: "", pain: "—", details: false, openSection: null, msgReadAt: {}, trends: null,
-  modal: null, stripCollapsed: false,
+  pendingCodes: [], target: null, place: "", pain: "—", details: false, msgReadAt: {}, trends: null,
+  modal: null,
 });
 
 export const useApp = create<AppState>(() => ({

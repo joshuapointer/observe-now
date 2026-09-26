@@ -27,10 +27,10 @@ appId: host.exp.Exponent
           end: 50%, 98%
       - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible: "The care device · caregivers start shifts here"
+    visible: "The care device"
     timeout: 30000
 - takeScreenshot: 01-auth
-- tapOn: "The care device · caregivers start shifts here"
+- tapOn: "The care device"
 - extendedWaitUntil:
     visible: "Start a shift"
     timeout: 15000
@@ -42,76 +42,66 @@ appId: host.exp.Exponent
 - tapOn: "Digit 3"
 - tapOn: "Digit 4"
 - extendedWaitUntil:
-    visible: "Welcome to Observe Now|Welcome to Garth Log"
+    visible: "Welcome to Observe Now"
     timeout: 15000
 - takeScreenshot: 04-welcome
-- tapOn: "Got it"
-- takeScreenshot: 05-record
+- tapOn: "Let's go"
+- takeScreenshot: 05-now
+- tapOn: "Record and more"
+- tapOn: "Record"
 - tapOn: "Sleep and waking.*"
 - tapOn: ".*Sleeping.*"
-- takeScreenshot: 06-step2
+- takeScreenshot: 06-record-sheet
 - tapOn: "Save .*"
 - takeScreenshot: 07-saved
 - assertVisible: "Saved.*"
 - tapOn: "Undo"
 - assertVisible: "Undone"
+- tapOn: "Record and more"
+- tapOn: "Record"
 - tapOn: "Sleep and waking.*"
 - tapOn: ".*Dozing off.*"
 - tapOn: "Save .*"
 - scrollUntilVisible:
-    element: "What's been recorded"
+    element: "RECORDED LATELY|Recorded lately"
     direction: DOWN
     centerElement: true
-- takeScreenshot: 08-feed
-- tapOn: "Messages.*tab.*"
+- takeScreenshot: 08-latest
+- tapOn: "Messages"
 - takeScreenshot: 09-messages
-- tapOn: "New message"
-- tapOn: "Write to family as Dana…"
+- tapOn: "New message to family"
+- tapOn: "Write to family…"
 - inputText: "Garth had a good dinner"
 - tapOn: "Send"
-- takeScreenshot: 10-sent
 - hideKeyboard:
     optional: true
-- takeScreenshot: 10b-thread
-- tapOn: "Notes.*tab.*"
-- takeScreenshot: 11-notes
+- takeScreenshot: 10-sent
+- tapOn: "Care"
+- takeScreenshot: 11-care
 - tapOn:
-    text: "Give now"
+    text: "Give"
     index: 0
 - takeScreenshot: 12-given
-- tapOn: "This week.*tab.*"
+- scrollUntilVisible:
+    element: "The last seven nights"
+    direction: DOWN
+    centerElement: true
+- tapOn: "The last seven nights"
 - extendedWaitUntil:
-    visible: "Seven nights.*"
+    visible: "SEVEN NIGHTS.*|Seven nights.*"
     timeout: 15000
-- scrollUntilVisible:
-    element: "What the week shows"
-    direction: DOWN
-    centerElement: true
 - takeScreenshot: 13-week
-- tapOn: "Settings.*tab.*"
-- takeScreenshot: 14-settings
-- scrollUntilVisible:
-    element: "Preview"
-    direction: DOWN
-    centerElement: true
-- tapOn: "Preview"
+- tapOn: "Back"
+- tapOn: "What family see"
 - waitForAnimationToEnd
 - extendedWaitUntil:
-    visible: "Good to know|GOOD TO KNOW"
+    visible: ".*right now.*"
     timeout: 10000
-- takeScreenshot: 15-preview
+- takeScreenshot: 14-preview
 - tapOn: "Back"
-- tapOn: "Record.*tab.*"
-- scrollUntilVisible:
-    element: "Care, safety and body.*"
-    direction: UP
-    centerElement: true
-- tapOn: "Care, safety and body.*"
-- scrollUntilVisible:
-    element: ".*A fall.*"
-    direction: DOWN
-    centerElement: true
-- tapOn: ".*A fall.*"
+- tapOn: "Now"
+- tapOn: "Record and more"
+- tapOn: "Report a fall"
 - takeScreenshot: 16-fall-confirm
 - tapOn: "Yes — Garth had a fall"
 - extendedWaitUntil:
@@ -120,29 +110,31 @@ appId: host.exp.Exponent
 - tapOn: "Beside the bed"
 - takeScreenshot: 17-fall-report
 - tapOn: "Back"
-- takeScreenshot: 18-record-after-fall
-- tapOn: "Settings.*tab.*"
+- takeScreenshot: 18-now-after-fall
+- tapOn: "You and this device"
+- tapOn: "Settings"
 - scrollUntilVisible:
-    element: "Sign out"
+    element: "Sign this device out"
     direction: DOWN
     centerElement: true
-- tapOn: "Sign out"
+- takeScreenshot: 19-settings
+- tapOn: "Sign this device out"
 - tapOn: "Yes, sign out"
-- tapOn: "Family · Ellen.*"
+- tapOn: "Family (Ellen)"
 - extendedWaitUntil:
-    visible: "Got it"
+    visible: "Let's go"
     timeout: 15000
-- takeScreenshot: 19-family-welcome
-- tapOn: "Got it"
+- takeScreenshot: 20-family-welcome
+- tapOn: "Let's go"
 - extendedWaitUntil:
     visible: ".*right now.*"
     timeout: 15000
-- takeScreenshot: 20-family
+- takeScreenshot: 21-family
 - tapOn: "Got it"
-- takeScreenshot: 21-family-acked
-- tapOn: "Reply.*"
+- takeScreenshot: 22-family-acked
+- tapOn: "Reply"
 - inputText: "Thank you Dana"
-- tapOn: "Send"
-- hideKeyboard:
-    optional: true
-- takeScreenshot: 22-family-replied
+- tapOn: "Send reply"
+- takeScreenshot: 23-family-replied
+- tapOn: "History"
+- takeScreenshot: 24-history

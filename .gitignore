@@ -47,3 +47,4 @@ yarn-error.*
 
 # Firebase emulator logs
 *-debug.log
+.tamagui/

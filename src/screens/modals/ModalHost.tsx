@@ -1,217 +1,154 @@
-// Renders the modal named by useApp().modal, ported from the PWA's modal()/helpFor()/welcomeFor()/peopleBody()
-// (views.js ~568-675, ~281-298).
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { usePathname } from "expo-router";
-import { useEffect, useState, type ReactNode } from "react";
-import { Modal, Platform, Pressable, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Every sheet in the app, driven by useApp().modal. Each one stays mounted so it can slide in and out.
+import { router, usePathname } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import type { TextInput } from "react-native";
+import { XStack, YStack } from "tamagui";
 
 import { APP_NAME } from "@/lib/config";
 import { PLACES, PAINS, type Med } from "@/lib/codes";
 import * as M from "@/lib/model";
 import type { Caregiver, Ctx, Entry, Member, OnShift, Patient } from "@/lib/types";
 import {
-  cgEdit, cgNew, cgRemove, closeModal, editField, editUncode, invite, LOCKED_CODES, medCancel, medEdit,
-  medField, medNew, medRemove, medSave, medToggleNeeded, saveDetails, saveEdit, setCanCare,
+  cgEdit, cgNew, cgRemove, closeModal, editField, editUncode, endShift, invite, LOCKED_CODES, medCancel, medEdit,
+  medField, medNew, medRemove, medSave, medToggleNeeded, openPicker, saveDetails, saveEdit, sendFamilyNote, setCanCare,
+  setDraft, setViewAs, startAddPatient,
 } from "@/state/actions";
-import { actingAs, useApp, type CgForm, type EditForm, type MedForm, type ModalId } from "@/state/app";
-import { notAsked, useView, type View as ComputedView } from "@/state/view";
+import { actingAs, useApp, type CgForm, type EditForm, type MedForm } from "@/state/app";
+import { msgWho, notAsked, useView, type View as ComputedView } from "@/state/view";
 import { CaregiverForm } from "@/screens/gate/CaregiverForm";
-import { useLayout } from "@/ui/layout";
-import { Bar, Button, Chip, Field, KeyboardArea, Row, Rule, Scroll, Seg, T } from "@/ui/primitives";
-import { useTheme } from "@/ui/theme";
+import { RecordSheet } from "@/screens/record/RecordSheet";
+import { ChatBubble } from "@/ui/ChatBubble";
+import { ArrowLeftRight, Eye, Plus, Settings, UserRound, Users } from "@/ui/icons";
+import { Button, Card, Chip, Field, ListRow, Rule, Section, Seg, T } from "@/ui/primitives";
+import { Sheet } from "@/ui/Sheet";
 
 // ---------------------------------------------------------------- help / welcome copy
-// Small parts arrays instead of parsed HTML: a plain string, or `b()`/`it()` for the PWA's <b>/<i> emphasis.
-type Part = string | { b: string } | { i: string };
-const b = (text: string): Part => ({ b: text });
-const it = (text: string): Part => ({ i: text });
-
 const HELP_ROUTE: Record<string, string> = {
-  "/record": "log", "/messages": "messages", "/notes": "notes", "/week": "trends",
-  "/fall": "fall", "/codes": "codes", "/preview": "family",
+  "/record": "now", "/messages": "messages", "/care": "care", "/week": "trends",
+  "/fall": "fall", "/codes": "codes", "/preview": "family", "/settings": "settings",
 };
 
-function helpFor(pathname: string, isFamily: boolean, V: ComputedView): [string, Part[][]] {
+function helpFor(pathname: string, isFamily: boolean, V: ComputedView): [string, string[]] {
   const n = V.ctx.name, c = V.ctx.caregiver;
   if (isFamily) {
-    return ["Using this page", [
-      [`The big box at the top shows what ${n} is doing right now. ${c} updates it through the day.`],
-      ["A red box is an important alert. Tap ", b("Got it"), " once you've read it."],
-      ["Tap any line in the list to see the exact clinical code."],
-      [`Type in the box at the bottom to send ${c} a message. They'll see it in the care app, on whichever phone or tablet it's open on.`],
-      ["Messages appear in the list with everything else, with replies underneath. Tap ", b("Reply"), " to answer one."],
+    return ["Using the app", [
+      `The coloured card shows what ${n} is doing right now. ${c} updates it through the day.`,
+      "A red card is an important alert. Tap Got it once you've read it.",
+      "Tap any line to see the clinical code that was recorded.",
+      `Tap Message to write to ${c}. Tap Reply under a conversation to answer it.`,
+      "History shows any day, box by box. Use the arrows to change day.",
     ]];
   }
-  const map: Record<string, [string, Part[][]]> = {
-    log: ["Recording what's happening", [
-      [b("Step 1."), " Tap a group (for example ", it("Sleep and waking"), `) to open it, then tap every square that matches what ${n} is doing — you can choose from more than one group.`],
-      [b("Step 2."), " Add details if you like (where, pain, a note), then press ", b("Save"), "."],
-      ["Family see your entry straight away, in everyday words."],
-      ["Boxes at the top are 15-minute gaps, covering the whole day. A red outline means one was left empty — tap it to fill it in. Tap a box that already has a code to add another."],
-      ["Made a mistake? Press ", b("Undo"), " in the message that appears after saving."],
-      ["The ", b("Messages"), " tab is where you write to family and answer them. A number on it means family have written something you haven't read yet."],
-      ["To change or remove something you recorded this shift, tap ", b("Edit"), " next to it under ", b("What's been recorded"), ", or tap its box."],
-      ["Finishing? Tap ", b("End shift"), " at the top so the next caregiver can start theirs."],
+  const map: Record<string, [string, string[]]> = {
+    now: ["Recording", [
+      `Every 15 minutes, tap the big card (or + then Record) and choose what ${n} is doing. Choose more than one if several things are true.`,
+      "The chips under the card save straight away, in one tap.",
+      "Tap any box in the day's row to fill in or change an earlier time. A dashed red box was left empty.",
+      "Made a mistake? Press Undo on the message that appears after saving, or tap the entry under Recorded lately.",
+      "The + button has Record, Report a fall, Give a medicine, Write a note and Message family.",
+      "Finishing? Tap the person button at the top, then End shift.",
     ]],
     fall: ["Fall report", [
-      ["This page opens when you tap ", b("A fall"), " on the Record screen. Family have already been told."],
-      ["Answer each question by tapping. Tap again to un-choose."],
-      ["Write what happened in your own words. It saves as you type."],
-      ["Press ", b("Send fall report to family"), " when you're done, then ", b("Back to Record"), "."],
-      ["If you leave before sending it, Record shows a red button to come back and finish it."],
+      "Family were alerted the moment the fall was recorded.",
+      "Answer each question by tapping. Tap again to un-choose.",
+      "Write what happened in your own words. It saves as you type.",
+      "Press Send the report to family when you're done.",
     ]],
-    notes: ["Notes and medicines", [
-      ["Press ", b("Give now"), " when you give a medicine. It's added to the log automatically."],
-      ["Tap a phrase or type your own note."],
-      [b("Save note (family can see it)"), " shares it in the family list. The other button keeps it private to caregivers."],
+    care: ["Care", [
+      "Press Give when you give a medicine. It's added to the log.",
+      "Tap a phrase or type a note, then save it for family or for caregivers only.",
     ]],
     trends: ["The last seven nights", [
-      ["Each row is one night, from evening to morning."],
-      ["Darker squares mean more restless. Red is a fall."],
-      ["The sentences underneath point out patterns worth mentioning to the nurse or doctor."],
+      "Each row is one night, from evening to morning.",
+      "Blue is asleep, green awake and calm, orange restless, red a fall.",
+      "The notes underneath point out patterns worth mentioning to the nurse or doctor.",
     ]],
-    messages: ["Messages with family", [
-      ["Conversations are listed on the left, newest first. A red dot means family wrote something you haven't read."],
-      ["Tap a conversation to open it, then write in the box at the bottom to reply."],
-      ["Tap ", b("New message"), " to start a new conversation with family."],
-      ["Family see your messages in their list of updates, with replies underneath, and can answer from there."],
+    messages: ["Messages", [
+      "A red number means family wrote something you haven't read.",
+      "Tap a conversation to open it and reply, or start a new one at the top.",
+      "Family see your messages with their updates and can answer.",
     ]],
-    family: ["What family see", [
-      ["This is exactly what family see on their phones."],
-      ["You can't send messages from here — it's a preview."],
+    family: ["What family see", ["This is exactly what family see. You can't send from here."]],
+    codes: ["Codes", [
+      "These are the choices in the record sheet. Changes show up straight away for everyone.",
+      "What family read is the plain description. The abbreviation shows in the day's boxes.",
+      "Removing a code only stops it being offered. Past entries keep it.",
     ]],
-    codes: ["Codes you can choose", [
-      ["These are the squares on the Record screen. Changes show up straight away, on this device and on family's phones."],
-      ["The ", b("short description"), " is what family read. The ", b("long description"), " shows when Everyday words is off."],
-      ["The ", b("abbreviation"), " (up to 4 letters) goes in the boxes at the top. Leave it empty and the boxes show the short description."],
-      ["Removing a code only stops it being offered. Past entries keep it, and you can put it back."],
-    ]],
+    settings: ["Settings", ["Add caregivers and family, change the codes and medicines, and choose how the app looks."]],
   };
-  return map[HELP_ROUTE[pathname] ?? ""] || ["Help", [["Tap the tabs at the top to move around."]]];
+  return map[HELP_ROUTE[pathname] ?? ""] || map.now;
 }
 
-function welcomeFor(isFamily: boolean, V: ComputedView): Part[][] {
+function welcomeFor(isFamily: boolean, V: ComputedView): string[] {
   const n = V.ctx.name, c = V.ctx.caregiver;
   if (isFamily) {
     return [
-      [`You'll see what ${n} is doing, kept up to date by ${c}.`],
-      ["A red box means something important has happened."],
-      ["You can send a message back at the bottom of the screen."],
-      ["Tap ", b("Help"), " at the top any time."],
+      `You'll see what ${n} is doing, kept up to date by ${c}.`,
+      "A red card means something important has happened.",
+      `Tap Message to write to ${c}.`,
     ];
   }
   return [
-    [`Every 15 minutes, tap what ${n} is doing — tap more than one if several things are true at once.`],
-    ["Family see it on their phones, in plain words."],
-    [`If ${n} falls, tap `, b("A fall"), " — family are alerted at once."],
-    ["Write to family, and read their messages, in the ", b("Messages"), " tab."],
-    ["When you finish, tap ", b("End shift"), " at the top. The next caregiver picks their name to start theirs."],
-    ["Tap ", b("Help"), " at the top any time."],
+    `Every 15 minutes, tap the big card (or + then Record) and choose what ${n} is doing.`,
+    "Family see it on their phones, in plain words.",
+    `If ${n} falls, tap + then Report a fall. Family are alerted at once.`,
+    "When you finish, tap the person button at the top and End shift.",
   ];
 }
 
-function Line({ parts }: { parts: Part[] }) {
-  const t = useTheme();
+function Steps({ items }: { items: string[] }) {
   return (
-    <T v="body" style={{ flex: 1 }}>
-      {parts.map((p, idx) => {
-        if (typeof p === "string") return <Text key={idx}>{p}</Text>;
-        if ("b" in p) return <Text key={idx} style={t.font("heavy")}>{p.b}</Text>;
-        return <Text key={idx} style={{ fontStyle: "italic" }}>{p.i}</Text>;
-      })}
-    </T>
-  );
-}
-
-function Steps({ items }: { items: Part[][] }) {
-  return (
-    <View style={{ gap: 12 }}>
-      {items.map((parts, idx) => (
-        <Row key={idx} gap={10} center={false}>
-          <T v="body" weight="black">{`${idx + 1}.`}</T>
-          <Line parts={parts} />
-        </Row>
+    <YStack gap={14}>
+      {items.map((s, i) => (
+        <XStack key={i} gap={12} items="flex-start">
+          <YStack width={28} height={28} rounded={14} bg="$accent3" items="center" justify="center">
+            <T fontSize={14} lineHeight={17} weight="black" color="$accent11">{i + 1}</T>
+          </YStack>
+          <T flex={1} fontSize={17} lineHeight={23}>{s}</T>
+        </XStack>
       ))}
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------- chrome shared by every sheet
-function ModalBar({ title }: { title: string }) {
-  const t = useTheme();
-  return (
-    <Bar
-      title={title}
-      right={
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={closeModal} hitSlop={8}>
-          <Ionicons name="close" size={22} color={t.colorful ? t.c.ink : t.c.onChrome} />
-        </Pressable>
-      }
-    />
-  );
-}
-
-function ModalBody({ children }: { children: ReactNode }) {
-  return (
-    <KeyboardArea style={{ flex: 1 }}>
-      <Scroll contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
-        {children}
-      </Scroll>
-    </KeyboardArea>
+    </YStack>
   );
 }
 
 // ---------------------------------------------------------------- medicines
 function MedsBody({ medForm, meds }: { medForm: MedForm | null; meds: Med[] }) {
-  const t = useTheme();
   if (medForm) {
     return (
-      <View style={{ gap: 14 }}>
-        <T v="eyebrow">{medForm.idx >= 0 ? "Change this medicine" : "Add a medicine"}</T>
+      <YStack gap={14}>
+        <T v="h2">{medForm.idx >= 0 ? "Change this medicine" : "Add a medicine"}</T>
         <Field label="Medicine name" value={medForm.name} onChangeText={v => medField("name", v)} autoComplete="off" autoCorrect={false} />
-        <Field label="Dose (for example 3 mg)" value={medForm.dose} onChangeText={v => medField("dose", v)} autoComplete="off" autoCorrect={false} />
-        <Field label={'When it’s given (for example “with breakfast”)'} value={medForm.sched} onChangeText={v => medField("sched", v)} autoComplete="off" autoCorrect={false} />
-        <View style={{ gap: 6 }}>
-          <T v="label">Only when needed?</T>
-          <Row><Seg title={medForm.asNeeded ? "Yes — only when needed" : "No — given on a schedule"} on={medForm.asNeeded} onPress={medToggleNeeded} /></Row>
-        </View>
+        <Field label="Dose" placeholder="For example 3 mg" value={medForm.dose} onChangeText={v => medField("dose", v)} autoComplete="off" autoCorrect={false} />
+        <Field label="When it's given" placeholder="For example with breakfast" value={medForm.sched} onChangeText={v => medField("sched", v)} autoComplete="off" autoCorrect={false} />
+        <XStack gap={8}>
+          <Seg title="On a schedule" on={!medForm.asNeeded} onPress={() => { if (medForm.asNeeded) medToggleNeeded(); }} />
+          <Seg title="Only when needed" on={medForm.asNeeded} onPress={() => { if (!medForm.asNeeded) medToggleNeeded(); }} />
+        </XStack>
         {medForm.asNeeded ? null : (
-          <Field
-            label="Time it's due (optional)"
-            value={medForm.dueAt}
-            onChangeText={v => medField("dueAt", v)}
-            keyboardType="number-pad"
-            placeholder="HH:MM"
-            hint="After this time it will show “Due now” until it's given."
-          />
+          <Field label="Time it's due (optional)" value={medForm.dueAt} onChangeText={v => medField("dueAt", v)} keyboardType="number-pad" placeholder="HH:MM" hint="After this time it shows Due now until it's given." />
         )}
-        <Row wrap gap={10}>
-          <Button kind="primary" big title="Save medicine" onPress={medSave} />
-          <Button big title="Cancel" onPress={medCancel} />
-        </Row>
-      </View>
+        <XStack gap={10}>
+          <Button kind="ghost" big title="Cancel" onPress={medCancel} />
+          <Button kind="primary" big grow title="Save medicine" onPress={medSave} />
+        </XStack>
+      </YStack>
     );
   }
   return (
-    <View>
-      {meds.length ? meds.map((m, i) => (
-        <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: t.c.line }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <T v="label">{m.name}</T>
-            <T v="small">{[m.dose, m.sched].filter(Boolean).join(" · ") + (m.asNeeded ? " · only when needed" : "")}</T>
-          </View>
-          <Row gap={8}>
-            <Seg title="Change" small onPress={() => medEdit(i)} />
-            <Seg title="Remove" small onPress={() => medRemove(i)} />
-          </Row>
-        </View>
-      )) : <T v="small">No medicines yet.</T>}
-      <Row wrap gap={10} style={{ paddingTop: 12 }}>
-        <Button kind="primary" big title="Add a medicine" onPress={medNew} />
-        <Button big title="Done" onPress={closeModal} />
-      </Row>
-    </View>
+    <YStack gap={14}>
+      <Card pad={0}>
+        {meds.length ? meds.map((m, i) => (
+          <ListRow
+            key={i}
+            title={m.name}
+            detail={[m.dose, m.sched].filter(Boolean).join(" · ") + (m.asNeeded ? " · only when needed" : "")}
+            last={i === meds.length - 1}
+            right={<XStack gap={6}><Seg title="Change" small onPress={() => medEdit(i)} /><Seg title="Remove" small onPress={() => medRemove(i)} /></XStack>}
+          />
+        )) : <T v="small" p={16}>No medicines yet.</T>}
+      </Card>
+      <Button kind="primary" big icon={Plus} title="Add a medicine" onPress={medNew} />
+    </YStack>
   );
 }
 
@@ -221,106 +158,89 @@ function DetailsBody({ patient }: { patient: Patient | null | undefined }) {
   const [careSetting, setCareSetting] = useState(patient?.careSetting || "");
   const [onCallPhone, setOnCallPhone] = useState(patient?.onCallPhone || "");
   return (
-    <View style={{ gap: 14 }}>
+    <YStack gap={14}>
       <Field label="Name" value={name} onChangeText={setName} autoComplete="off" autoCorrect={false} />
-      <Field label={'Care setting (for example “Home, 24-hour care”)'} value={careSetting} onChangeText={setCareSetting} autoComplete="off" autoCorrect={false} />
-      <Field
-        label="On-call nurse's phone number (adds a Call button to the fall report)"
-        value={onCallPhone}
-        onChangeText={setOnCallPhone}
-        keyboardType="phone-pad"
-        autoComplete="off"
-      />
-      <Row wrap gap={10}>
-        <Button kind="primary" big title="Save" onPress={() => saveDetails({ name, careSetting, onCallPhone })} />
-        <Button big title="Cancel" onPress={closeModal} />
-      </Row>
-    </View>
+      <Field label="Care setting" placeholder="For example Home, 24-hour care" value={careSetting} onChangeText={setCareSetting} autoComplete="off" autoCorrect={false} />
+      <Field label="On-call nurse's number" hint="Adds a Call button to the fall report." value={onCallPhone} onChangeText={setOnCallPhone} keyboardType="phone-pad" autoComplete="off" />
+      <Button kind="primary" big title="Save" onPress={() => saveDetails({ name, careSetting, onCallPhone })} />
+    </YStack>
   );
 }
 
 // ---------------------------------------------------------------- caregivers
 function CaregiversBody({ cgForm, roster, onShift }: { cgForm: CgForm | null; roster: Caregiver[]; onShift: OnShift | null }) {
-  const t = useTheme();
   if (cgForm) return <CaregiverForm key={cgForm.id ?? "new"} form={cgForm} cancellable />;
   return (
-    <View>
-      {roster.length ? roster.map(c => (
-        <View key={c.id} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: t.c.line }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <T v="label">{c.name}</T>
-            <T v="small">{onShift?.cid === c.id ? "On shift now" : "Can start a shift"}</T>
-          </View>
-          <Row gap={8}>
-            <Seg title="Change" small onPress={() => cgEdit(c.id)} />
-            <Seg title="Remove" small onPress={() => cgRemove(c.id)} />
-          </Row>
-        </View>
-      )) : <T v="small">No caregivers yet.</T>}
-      <Row wrap gap={10} style={{ paddingTop: 12 }}>
-        <Button kind="primary" big title="Add a caregiver" onPress={cgNew} />
-        <Button big title="Done" onPress={closeModal} />
-      </Row>
-    </View>
+    <YStack gap={14}>
+      <Card pad={0}>
+        {roster.length ? roster.map((c, i) => (
+          <ListRow
+            key={c.id}
+            title={c.name}
+            detail={onShift?.cid === c.id ? "On shift now" : "Can start a shift"}
+            last={i === roster.length - 1}
+            right={<XStack gap={6}><Seg title="Change" small onPress={() => cgEdit(c.id)} /><Seg title="Remove" small onPress={() => cgRemove(c.id)} /></XStack>}
+          />
+        )) : <T v="small" p={16}>No caregivers yet.</T>}
+      </Card>
+      <Button kind="primary" big icon={Plus} title="Add a caregiver" onPress={cgNew} />
+    </YStack>
   );
 }
 
 // ---------------------------------------------------------------- family (people)
 function PeopleBody({ family, live, isOwner }: { family: Member[]; live: Member[]; isOwner: boolean }) {
-  const t = useTheme();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("");
   const [detail, setDetail] = useState("");
   return (
-    <View style={{ gap: 16 }}>
-      <View>
-        {family.length ? family.map(m => {
+    <YStack gap={18}>
+      <Card pad={0}>
+        {family.length ? family.map((m, i) => {
           const on = live.some(x => x.id === m.id);
+          const cares = m.role === "caregiver";
           return (
-            <View key={m.id} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: t.c.line, gap: 2 }}>
-              <Row style={{ justifyContent: "space-between" }}>
-                <T v="label">{m.name}{m.relation ? ` · ${m.relation}` : ""}</T>
-                <T v="small" color={on ? t.c.live : undefined}>{on ? "Watching now" : "Not online"}</T>
-              </Row>
-              {m.detail ? <T v="small">{m.detail}</T> : null}
+            <YStack key={m.id} px={16} py={12} gap={6} borderBottomWidth={i === family.length - 1 ? 0 : 1} borderBottomColor="$color4">
+              <XStack justify="space-between" items="center" gap={8}>
+                <T v="label" flex={1}>{m.name}{m.relation ? ` · ${m.relation}` : ""}</T>
+                <T v="small" fontSize={13} weight="heavy" color={on ? "$green11" : "$color10"}>{on ? "Watching now" : "Not online"}</T>
+              </XStack>
+              {m.detail ? <T v="small" fontSize={13}>{m.detail}</T> : null}
               {isOwner ? (
-                <Row style={{ justifyContent: "space-between", marginTop: 4 }}>
-                  <T v="small" style={{ flex: 1 }}>
-                    {m.role === "caregiver" ? "Can also act as a caregiver" : "Family only"}
-                  </T>
+                <XStack justify="space-between" items="center" gap={8}>
+                  <T v="small" fontSize={13} flex={1}>{cares ? "Can also act as a caregiver" : "Family only"}</T>
                   <Seg
                     small
-                    title={m.role === "caregiver" ? "Stop" : "Let them care"}
-                    accessibilityLabel={m.role === "caregiver" ? `Stop ${m.name} acting as a caregiver` : `Let ${m.name} also act as a caregiver`}
-                    onPress={() => setCanCare(m.id, m.role !== "caregiver")}
+                    title={cares ? "Stop" : "Let them care"}
+                    accessibilityLabel={cares ? `Stop ${m.name} acting as a caregiver` : `Let ${m.name} also act as a caregiver`}
+                    onPress={() => setCanCare(m.id, !cares)}
                   />
-                </Row>
+                </XStack>
               ) : null}
-            </View>
+            </YStack>
           );
-        }) : <T v="small">No family on this log yet.</T>}
-      </View>
-      <T v="small">Family read plain sentences, not codes (they can tap a line to see the code). A red alert is sent straight away for a fall, grabbing or pushing, or pain of 7 or more.</T>
+        }) : <T v="small" p={16}>No family on this log yet.</T>}
+      </Card>
+      <T v="small" fontSize={13}>Family read plain sentences, not codes. A red alert goes out straight away for a fall, grabbing or pushing, or pain of 7 or more.</T>
       {isOwner ? (
-        <View style={{ gap: 10 }}>
+        <YStack gap={10}>
           <Rule />
-          <T v="eyebrow">Invite a family member</T>
-          <Field placeholder="Their email address or mobile number" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="off" autoCorrect={false} />
-          <Field placeholder="Their name" value={name} onChangeText={setName} autoComplete="off" />
-          <Field placeholder="How they're related (daughter, son…)" value={relation} onChangeText={setRelation} autoComplete="off" />
-          <Field placeholder="Anything useful (for example: lives overseas)" value={detail} onChangeText={setDetail} autoComplete="off" />
+          <T v="h2">Invite family</T>
+          <Field placeholder="Their email address or mobile number" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="off" autoCorrect={false} accessibilityLabel="Email address or mobile number" />
+          <Field placeholder="Their name" value={name} onChangeText={setName} autoComplete="off" accessibilityLabel="Name" />
+          <Field placeholder="How they're related (daughter, son…)" value={relation} onChangeText={setRelation} autoComplete="off" accessibilityLabel="Relation" />
+          <Field placeholder="Anything useful (for example lives overseas)" value={detail} onChangeText={setDetail} autoComplete="off" accessibilityLabel="Anything useful" />
           <Button
             kind="primary"
             big
             title="Send invitation"
             onPress={() => { if (invite({ contact: email, name, relation, detail })) { setEmail(""); setName(""); setRelation(""); setDetail(""); } }}
           />
-          <T v="small">{"They sign in on their own phone or tablet with this email address or mobile number and are let in automatically. Caregivers don't need an invitation: add them under Settings → Caregivers."}</T>
-        </View>
+          <T v="small" fontSize={13}>{"They sign in with this email or number and are let in automatically. Caregivers don't need an invitation: add them under Caregivers."}</T>
+        </YStack>
       ) : null}
-      <Button big title="Done" onPress={closeModal} />
-    </View>
+    </YStack>
   );
 }
 
@@ -328,48 +248,143 @@ function PeopleBody({ family, live, isOwner }: { family: Member[]; live: Member[
 function EditEntryBody({ edit, entry, ctx, plain }: { edit: EditForm; entry: Entry; ctx: Ctx; plain: boolean }) {
   const locked = (c: string) => LOCKED_CODES.includes(c);
   const hasLocked = M.entryCodes(entry).some(locked);
-  const removableNote = edit.codes.some(c => !locked(c));
   const showMedChip = edit.med && !edit.codes.includes("MD");
   return (
-    <>
-      <View style={{ gap: 8 }}>
-        <T v="label">{`What was recorded${removableNote ? " — tap × to remove" : ""}`}</T>
-        <Row wrap gap={8}>
+    <YStack gap={18}>
+      <Section title="What was recorded">
+        <XStack flexWrap="wrap" gap={8}>
           {edit.codes.map(c => locked(c) ? (
-            <Chip key={c} title={`${plain ? M.codeText(c, ctx) : M.codeLabel(c, ctx)} · alert sent`} />
+            <Chip key={c} title={`${plain ? M.codeText(c, ctx) : M.codeLabel(c, ctx)} · alert sent`} cat={ctx.reg.CAT[c] || null} />
           ) : (
-            <Chip key={c} title={plain ? M.codeText(c, ctx) : M.codeLabel(c, ctx)} onRemove={() => editUncode(c)} />
+            <Chip key={c} title={plain ? M.codeText(c, ctx) : M.codeLabel(c, ctx)} cat={ctx.reg.CAT[c] || null} onRemove={() => editUncode(c)} />
           ))}
           {showMedChip ? <Chip title="Medicine given" onRemove={() => editUncode("MD")} /> : null}
           {!edit.codes.length && !showMedChip ? <T v="small">Nothing left but the note.</T> : null}
-        </Row>
-        <T v="small">To add something, close this, tap the box, then tap the square.</T>
-      </View>
-      <View style={{ gap: 8 }}>
-        <T v="label">{`Where was ${ctx.name}?`}</T>
-        <Row wrap gap={8}>
-          {PLACES.map(o => <Seg key={o} title={o} on={edit.place === o} onPress={() => editField("place", o)} />)}
-        </Row>
-      </View>
-      <View style={{ gap: 8 }}>
-        <T v="label">Pain level</T>
-        <Row wrap gap={8}>
-          {PAINS.map(o => <Seg key={o} title={notAsked(o)} wide={o === "—"} on={edit.pain === o} onPress={() => editField("pain", o)} />)}
-        </Row>
-      </View>
+        </XStack>
+        <T v="small" fontSize={13}>Tap × to remove. To add something, close this and tap the box.</T>
+      </Section>
+      <Section title={`Where was ${ctx.name}?`}>
+        <XStack flexWrap="wrap" gap={8}>{PLACES.map(o => <Seg key={o} small title={o} on={edit.place === o} onPress={() => editField("place", o)} />)}</XStack>
+      </Section>
+      <Section title="Pain level">
+        <XStack flexWrap="wrap" gap={6}>{PAINS.map(o => <Seg key={o} small title={notAsked(o)} wide={o === "—"} on={edit.pain === o} onPress={() => editField("pain", o)} />)}</XStack>
+      </Section>
       <Field label="Note" value={edit.note} onChangeText={v => editField("note", v)} autoComplete="off" />
-      {hasLocked ? <T v="small">This entry sent a red alert to family, so the alert and the entry itself stay on the record.</T> : null}
-      <Row wrap gap={10}>
-        <Button kind="primary" big title="Save changes" onPress={() => saveEdit(false)} />
-        <Button kind="danger" big title="Delete entry" disabled={hasLocked} onPress={() => saveEdit(true)} />
-        <Button big title="Cancel" onPress={closeModal} />
-      </Row>
-    </>
+      {hasLocked ? <T v="small" fontSize={13}>This entry sent a red alert to family, so the alert and the entry stay on the record.</T> : null}
+      <XStack gap={10} flexWrap="wrap">
+        <Button kind="danger" title="Delete" disabled={hasLocked} onPress={() => saveEdit(true)} />
+        <Button kind="primary" big grow title="Save changes" onPress={() => saveEdit(false)} />
+      </XStack>
+    </YStack>
+  );
+}
+
+// ---------------------------------------------------------------- family: write a message
+function ComposeBody() {
+  const V = useView();
+  const me = useApp(s => s.user?.uid);
+  const replyToId = useApp(s => s.replyTo);
+  const draft = useApp(s => s.drafts.familyNote || "");
+  const input = useRef<TextInput>(null);
+  const th = replyToId ? V.threads.find(t => t.root.id === replyToId) : null;
+  useEffect(() => { const t = setTimeout(() => input.current?.focus(), 350); return () => clearTimeout(t); }, []);
+  return (
+    <YStack gap={14}>
+      {th ? (
+        <Card gap={8} pad={12}>
+          <ChatBubble text={th.root.text} mine={th.root.uid === me} who={msgWho(th.root)} when={M.hhmm(th.root.at)} />
+          {th.replies.slice(-2).map(r => <ChatBubble key={r.id} text={r.text} mine={r.uid === me} who={msgWho(r)} when={M.hhmm(r.at)} />)}
+        </Card>
+      ) : null}
+      <Field
+        ref={input}
+        multiline
+        minHeight={120}
+        value={draft}
+        onChangeText={v => setDraft("familyNote", v)}
+        placeholder={th ? "Write your reply…" : `Write to ${V.ctx.caregiver}…`}
+        accessibilityLabel={th ? "Reply" : "Message"}
+        autoCapitalize="sentences"
+      />
+      <Button kind="primary" big title={th ? "Send reply" : "Send"} disabled={!draft.trim()} onPress={sendFamilyNote} />
+      <T v="small" fontSize={13}>{`${V.ctx.caregiver} sees it in the care app's Messages. It doesn't ring or interrupt.`}</T>
+    </YStack>
+  );
+}
+
+// ---------------------------------------------------------------- you, this device, the shift, modes
+function AccountBody() {
+  const V = useView();
+  const member = useApp(s => s.member);
+  const links = useApp(s => s.links) || [];
+  const pendingInvites = useApp(s => s.pendingInvites);
+  const isFamily = useApp(s => actingAs(s)) === "family";
+  const canCare = member?.role === "caregiver";
+  const sameMode = links.filter(l => (l.role === "family") === isFamily);
+  const canSwitch = sameMode.length > 1 || !!pendingInvites?.length;
+  const go = (path: "/settings" | "/family-settings" | "/preview") => { closeModal(); router.push(path); };
+
+  return (
+    <YStack gap={18}>
+      {!isFamily && V.onShift ? (
+        <Card gap={12}>
+          <XStack items="center" gap={12}>
+            <YStack width={48} height={48} rounded={24} bg="$accent4" items="center" justify="center">
+              <T weight="black" fontSize={20} color="$accent11">{M.firstName(V.onShift.name).slice(0, 1)}</T>
+            </YStack>
+            <YStack flex={1}>
+              <T v="h2">{V.onShift.name}</T>
+              <T v="small">{`On shift since ${M.hhmm(V.onShift.since)}`}</T>
+            </YStack>
+          </XStack>
+          <Button kind="danger" big title="End shift" onPress={() => { closeModal(); endShift(); }} />
+        </Card>
+      ) : null}
+      <Card pad={0}>
+        <ListRow
+          icon={isFamily ? Eye : UserRound}
+          title={isFamily ? `Following ${V.ctx.name}` : `Caring for ${V.ctx.name}`}
+          detail={isFamily ? "Family member" : "Caregiver"}
+          right={canSwitch ? <Seg small title="Switch" onPress={() => openPicker(isFamily ? "family" : "care")} /> : undefined}
+        />
+        {canCare ? (
+          <ListRow
+            icon={ArrowLeftRight}
+            title={isFamily ? "Caregiver mode" : "Family mode"}
+            detail={isFamily ? `Record and look after ${V.ctx.name}` : `See ${V.ctx.name}'s day the way family do`}
+            onPress={() => { closeModal(); setViewAs(isFamily ? "care" : "family"); }}
+          />
+        ) : null}
+        {isFamily ? null : <ListRow icon={Users} title="Look after someone else" detail="Add a person and be their caregiver" onPress={startAddPatient} />}
+        <ListRow icon={Settings} title="Settings" onPress={() => go(isFamily ? "/family-settings" : "/settings")} last />
+      </Card>
+      <T v="small" fontSize={13} center>{isFamily ? "Sign out is in Settings." : "Signing this device out is in Settings."}</T>
+    </YStack>
   );
 }
 
 // ---------------------------------------------------------------- host
-function ModalContent({ modal }: { modal: NonNullable<ModalId> }) {
+// iOS won't present a sheet while another is still sliding away, so when one sheet hands over to another (record →
+// edit, account → picker) the next one waits for the first to close.
+function useShownModal() {
+  const [shown, setShown] = useState(useApp.getState().modal);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const unsub = useApp.subscribe((s, prev) => {
+      if (s.modal === prev.modal) return;
+      clearTimeout(t);
+      if (s.modal && prev.modal) {
+        setShown(null);
+        t = setTimeout(() => setShown(useApp.getState().modal), 450);
+      } else setShown(s.modal);
+    });
+    return () => { unsub(); clearTimeout(t); };
+  }, []);
+  return shown;
+}
+
+export function ModalHost() {
+  const modal = useShownModal();
   const V = useView();
   const pathname = usePathname();
   const medForm = useApp(s => s.medForm);
@@ -377,90 +392,49 @@ function ModalContent({ modal }: { modal: NonNullable<ModalId> }) {
   const patient = useApp(s => s.patient);
   const edit = useApp(s => s.edit);
   const data = useApp(s => s.data);
+  const replyToId = useApp(s => s.replyTo);
   const isFamily = useApp(s => actingAs(s)) === "family";
   const editEntry = edit ? data[edit.sid]?.entries.find(e => e.id === edit.id) || null : null;
 
-  // Guards against the entry an open edit modal points at disappearing from under it (e.g. removed elsewhere).
+  // Guards against the entry an open edit sheet points at disappearing from under it (e.g. removed elsewhere).
   useEffect(() => {
     if (modal === "edit-entry" && edit && !editEntry) closeModal();
   }, [modal, edit, editEntry]);
 
-  if (modal === "help" || modal === "welcome") {
-    const [title, items] = modal === "welcome" ? [`Welcome to ${APP_NAME}`, welcomeFor(isFamily, V)] : helpFor(pathname, isFamily, V);
-    return (
-      <>
-        <ModalBar title={title} />
-        <ModalBody>
-          <Steps items={items} />
-          <Button kind="primary" big title="Got it" onPress={closeModal} />
-        </ModalBody>
-      </>
-    );
-  }
-  if (modal === "meds") {
-    return (
-      <>
-        <ModalBar title={`Medicines for ${V.ctx.name}`} />
-        <ModalBody><MedsBody medForm={medForm} meds={V.meds} /></ModalBody>
-      </>
-    );
-  }
-  if (modal === "details") {
-    return (
-      <>
-        <ModalBar title="Details" />
-        <ModalBody><DetailsBody patient={patient} /></ModalBody>
-      </>
-    );
-  }
-  if (modal === "caregivers") {
-    return (
-      <>
-        <ModalBar title={`Caregivers for ${V.ctx.name}`} />
-        <ModalBody><CaregiversBody cgForm={cgForm} roster={V.roster} onShift={V.onShift} /></ModalBody>
-      </>
-    );
-  }
-  if (modal === "people") {
-    return (
-      <>
-        <ModalBar title="Family" />
-        <ModalBody><PeopleBody family={V.family} live={V.live} isOwner={V.isOwner} /></ModalBody>
-      </>
-    );
-  }
-  if (modal === "edit-entry") {
-    if (!edit || !editEntry) return null;
-    return (
-      <>
-        <ModalBar title={`Change the ${M.hhmm(editEntry.slotStart)} entry`} />
-        <ModalBody><EditEntryBody edit={edit} entry={editEntry} ctx={V.ctx} plain={V.plain} /></ModalBody>
-      </>
-    );
-  }
-  return null;
-}
+  const [helpTitle, helpItems] = helpFor(pathname, isFamily, V);
 
-export function ModalHost() {
-  const modal = useApp(s => s.modal);
-  const { isTablet } = useLayout();
-  const t = useTheme();
-  // iOS shows these as sheets below the status bar. Android draws them edge to edge, so keep the title bar and
-  // the buttons clear of the status and navigation bars.
-  const insets = useSafeAreaInsets();
-  const edges = Platform.OS === "android" ? { paddingTop: insets.top, paddingBottom: insets.bottom } : null;
-
-  if (!modal) return null;
   return (
-    <Modal
-      visible
-      animationType="slide"
-      presentationStyle={Platform.OS === "ios" ? (isTablet ? "formSheet" : "pageSheet") : undefined}
-      onRequestClose={closeModal}
-    >
-      <View style={[{ flex: 1, backgroundColor: t.c.bg }, edges]}>
-        <ModalContent modal={modal} />
-      </View>
-    </Modal>
+    <>
+      <RecordSheet open={modal === "record"} />
+      <Sheet open={modal === "help"} onClose={closeModal} title={helpTitle}>
+        <Steps items={helpItems} />
+        <Button kind="primary" big title="Got it" onPress={closeModal} />
+      </Sheet>
+      <Sheet open={modal === "welcome"} onClose={closeModal} title={`Welcome to ${APP_NAME}`}>
+        <Steps items={welcomeFor(isFamily, V)} />
+        <Button kind="primary" big title="Let's go" onPress={closeModal} />
+      </Sheet>
+      <Sheet open={modal === "meds"} onClose={closeModal} title={`Medicines for ${V.ctx.name}`}>
+        <MedsBody medForm={medForm} meds={V.meds} />
+      </Sheet>
+      <Sheet open={modal === "details"} onClose={closeModal} title="Details">
+        <DetailsBody key={patient?.name || ""} patient={patient} />
+      </Sheet>
+      <Sheet open={modal === "caregivers"} onClose={closeModal} title={`Caregivers for ${V.ctx.name}`}>
+        <CaregiversBody cgForm={cgForm} roster={V.roster} onShift={V.onShift} />
+      </Sheet>
+      <Sheet open={modal === "people"} onClose={closeModal} title="Family">
+        <PeopleBody family={V.family} live={V.live} isOwner={V.isOwner} />
+      </Sheet>
+      <Sheet open={modal === "edit-entry" && !!editEntry} onClose={closeModal} title={editEntry ? `The ${M.hhmm(editEntry.slotStart)} entry` : "Entry"}>
+        {edit && editEntry ? <EditEntryBody edit={edit} entry={editEntry} ctx={V.ctx} plain={V.plain} /> : null}
+      </Sheet>
+      <Sheet open={modal === "compose"} onClose={closeModal} title={replyToId ? "Reply" : `Message ${V.ctx.caregiver}`}>
+        <ComposeBody />
+      </Sheet>
+      <Sheet open={modal === "account"} onClose={closeModal} title={isFamily ? "You" : "This device"}>
+        <AccountBody />
+      </Sheet>
+    </>
   );
 }

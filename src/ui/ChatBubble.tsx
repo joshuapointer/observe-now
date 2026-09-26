@@ -1,11 +1,8 @@
 // One chat message, drawn like iMessage: your own on the right in blue with white text, everyone else's on the
 // left in grey with their name above. The corner nearest the sender stays tight, like the bubble's tail.
-import { StyleSheet, View } from "react-native";
+import { YStack } from "tamagui";
 
 import { T } from "./primitives";
-import { useTheme } from "./theme";
-
-const BLUE = "#0a84ff";
 
 export function ChatBubble({ text, mine, who, when, isNew }: {
   text: string;
@@ -14,31 +11,30 @@ export function ChatBubble({ text, mine, who, when, isNew }: {
   when: string;
   isNew?: boolean;
 }) {
-  const t = useTheme();
-  const grey = t.night ? "#2c2c30" : "#e9e9eb";
   return (
-    <View style={[styles.row, { alignItems: mine ? "flex-end" : "flex-start" }]} accessible accessibilityLabel={`${mine ? "You" : who || ""}, ${when}${isNew ? ", new" : ""}: ${text}`}>
-      {!mine && who ? <T v="small" color={t.c.mute} style={styles.who}>{who}</T> : null}
-      <View
-        style={[
-          styles.bubble,
-          mine
-            ? { backgroundColor: BLUE, borderBottomRightRadius: 5 }
-            : { backgroundColor: grey, borderBottomLeftRadius: 5 },
-        ]}
+    <YStack
+      gap={2}
+      items={mine ? "flex-end" : "flex-start"}
+      accessible
+      aria-label={`${mine ? "You" : who || ""}, ${when}${isNew ? ", new" : ""}: ${text}`}
+      transition="quick"
+      enterStyle={{ opacity: 0, y: 8, scale: 0.98 }}
+    >
+      {!mine && who ? <T v="small" fontSize={12} lineHeight={15} mx={14}>{who}</T> : null}
+      <YStack
+        maxW="82%"
+        px={14}
+        py={9}
+        rounded={20}
+        borderBottomRightRadius={mine ? 6 : 20}
+        borderBottomLeftRadius={mine ? 20 : 6}
+        bg={mine ? "$blue9" : "$color4"}
       >
-        <T color={mine ? "#ffffff" : t.c.ink}>{text}</T>
-      </View>
-      <T v="small" color={isNew ? t.c.accentInk : t.c.mute} weight={isNew ? "bold" : undefined} style={styles.when}>
+        <T color={mine ? "$white1" : "$color12"}>{text}</T>
+      </YStack>
+      <T fontSize={11} lineHeight={14} mx={14} weight={isNew ? "heavy" : "semibold"} color={isNew ? "$accent11" : "$color10"}>
         {isNew ? `${when} · New` : when}
       </T>
-    </View>
+    </YStack>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { gap: 2 },
-  who: { marginHorizontal: 14, fontSize: 12 },
-  bubble: { maxWidth: "80%", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20 },
-  when: { marginHorizontal: 14, fontSize: 11 },
-});

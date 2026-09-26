@@ -1,1 +1,1 @@
-export { RecordScreen as default } from "@/screens/record/RecordScreen";
+export { NowScreen as default } from "@/screens/now/NowScreen";

@@ -1,8 +1,3 @@
-import { Archivo_400Regular } from "@expo-google-fonts/archivo/400Regular";
-import { Archivo_600SemiBold } from "@expo-google-fonts/archivo/600SemiBold";
-import { Archivo_700Bold } from "@expo-google-fonts/archivo/700Bold";
-import { Archivo_800ExtraBold } from "@expo-google-fonts/archivo/800ExtraBold";
-import { Archivo_900Black } from "@expo-google-fonts/archivo/900Black";
 import { Nunito_400Regular } from "@expo-google-fonts/nunito/400Regular";
 import { Nunito_600SemiBold } from "@expo-google-fonts/nunito/600SemiBold";
 import { Nunito_700Bold } from "@expo-google-fonts/nunito/700Bold";
@@ -14,13 +9,15 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useEffect, useMemo, useState } from "react";
+import { TamaguiProvider, Theme } from "tamagui";
 
 import { loadKv } from "@/lib/kv";
 import { actingAs, hydrateApp, useApp, type AppState } from "@/state/app";
 import { boot } from "@/state/session";
 import { ModalHost } from "@/screens/modals/ModalHost";
 import { EnvTag, Toast } from "@/ui/shell";
-import { useTheme } from "@/ui/theme";
+import { useColors, useNight } from "@/ui/theme";
+import { config } from "../../tamagui.config";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -36,7 +33,6 @@ export function modeOf(S: AppState): Mode {
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold, Nunito_900Black,
-    Archivo_400Regular, Archivo_600SemiBold, Archivo_700Bold, Archivo_800ExtraBold, Archivo_900Black,
   });
   const [ready, setReady] = useState(false);
 
@@ -49,25 +45,37 @@ export default function RootLayout() {
   useEffect(() => { if (loaded) SplashScreen.hideAsync().catch(() => {}); }, [loaded]);
 
   if (!loaded) return null;
-  return <RootNav />;
+  return <Themed />;
+}
+
+// Light or night follows Settings → Screen (Auto follows the device).
+function Themed() {
+  const night = useNight();
+  return (
+    <TamaguiProvider config={config} defaultTheme={night ? "dark" : "light"}>
+      <Theme name={night ? "dark" : "light"}>
+        <RootNav />
+      </Theme>
+    </TamaguiProvider>
+  );
 }
 
 function RootNav() {
   const mode = useApp(modeOf);
-  const t = useTheme();
+  const night = useNight();
+  const c = useColors();
 
-  useEffect(() => { SystemUI.setBackgroundColorAsync(t.c.bg).catch(() => {}); }, [t.c.bg]);
+  useEffect(() => { SystemUI.setBackgroundColorAsync(c.page).catch(() => {}); }, [c.page]);
 
   const navTheme = useMemo(() => {
-    const base = t.night ? DarkTheme : DefaultTheme;
-    return { ...base, colors: { ...base.colors, background: t.c.bg, card: t.c.ground, text: t.c.ink, border: t.c.line, primary: t.c.accent, notification: t.c.danger } };
-  }, [t]);
+    const base = night ? DarkTheme : DefaultTheme;
+    return { ...base, colors: { ...base.colors, background: c.page, card: c.page, text: c.ink, border: c.line, primary: c.accent, notification: c.danger } };
+  }, [night, c.page, c.ink, c.line, c.accent, c.danger]);
 
   return (
     <ThemeProvider value={navTheme}>
-      {/* Signed-in screens have a dark chrome bar at the top; the sign-in and shift screens sit on the page colour. */}
-      <StatusBar style={mode === "gate" && !t.night ? "dark" : "light"} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.c.bg }, animation: "fade" }}>
+      <StatusBar style={night ? "light" : "dark"} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.page }, animation: "fade" }}>
         <Stack.Protected guard={mode === "gate"}>
           <Stack.Screen name="(gate)/index" />
         </Stack.Protected>

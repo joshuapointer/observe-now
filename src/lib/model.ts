@@ -108,6 +108,12 @@ export function entryLine(e: Partial<Entry>, ctx: Ctx, plain = true) {
   return text ? text.replace(/[.\s]+$/, "") + "." + painPart(e) : painPart(e).trim();
 }
 
+// What was recorded (codes and pain), without the note: for views that show the note on its own.
+export function codesLine(e: Partial<Entry>, ctx: Ctx, plain = true) {
+  const codes = entryCodes(e);
+  const base = codes.length ? codesText(codes, ctx, plain).replace(/[.\s]+$/, "") + "." : "";
+  return (base + painPart(e)).trim();
+}
 export const sentence = (s?: string) => { const t = (s || "").trim(); return t && !/[.!?]$/.test(t) ? t + "." : t; };
 
 export function alertText(kind: string, ctx: Ctx, extra: { pain?: string } = {}) {

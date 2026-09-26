@@ -1,68 +1,60 @@
-// Family's whole app (also shown to caregivers as a read-only "framed" preview).
-// Port of the PWA's familyView + the preview wrapper + familyRules (views.js).
-import { useEffect, useMemo, useRef } from "react";
-import { FlatList, Pressable, StyleSheet, View, type TextInput } from "react-native";
+// Family's Updates: what's happening right now, an important alert if there is one, then everything in time
+// order (an entry at its 15-minute box, a message when it was sent). Also the caregivers' read-only preview.
+import { useMemo } from "react";
+import { FlatList } from "react-native";
+import { Theme, XStack, YStack } from "tamagui";
 
 import * as M from "@/lib/model";
 import type { Entry, Message } from "@/lib/types";
-import { ackAlert, replyTo as setReplyTo, reveal, sendFamilyNote, setDraft } from "@/state/actions";
+import { ackAlert, compose, reveal } from "@/state/actions";
 import { useApp } from "@/state/app";
-import { msgWho, nowDetail, nowText, useView, whoBy, type Thread } from "@/state/view";
+import { msgWho, useView, whoBy, type Thread, type View as ViewModel } from "@/state/view";
+import { catTheme } from "@/ui/cat";
 import { ChatBubble } from "@/ui/ChatBubble";
+import { NoteCard } from "@/ui/NoteCard";
+import { Fab } from "@/ui/Fab";
+import { MessagesSquare, Siren } from "@/ui/icons";
 import { useLayout } from "@/ui/layout";
-import { Button, Card, Field, KeyboardArea, Screen, T } from "@/ui/primitives";
-import { useTheme } from "@/ui/theme";
+import { Screen, T } from "@/ui/primitives";
+import { NowCard } from "./NowCard";
 
 type FeedItem = { at: number; x: Entry } | { at: number; t: Thread };
-
-const FAMILY_RULES: [string, string][] = [
-  ["Plain words, not codes", "Family read everyday sentences. Tapping a line shows the clinical code that was recorded."],
-  ["Red alerts are rare", "Only a fall, grabbing or pushing, or pain of 7 or more sends a red alert. Everything else waits quietly in the list."],
-  ["Messages go to the caregiver", "A message from family shows up in the care app's Messages tab and on the Record screen, on whichever phone or tablet it's open on. It doesn't ring or interrupt."],
-];
-
-function RulesSection() {
-  return (
-    <View style={styles.rules}>
-      <T v="eyebrow">Good to know</T>
-      {FAMILY_RULES.map(([title, body]) => (
-        <Card key={title}>
-          <T v="label">{title}</T>
-          <T v="small" style={{ marginTop: 4 }}>{body}</T>
-        </Card>
-      ))}
-    </View>
-  );
-}
 
 function MessageBubble({ n, me, isNew }: { n: Message; me?: string; isNew: boolean }) {
   return <ChatBubble text={n.text} mine={n.uid === me} who={msgWho(n)} when={M.hhmm(n.at)} isNew={isNew} />;
 }
 
-// framed = the caregiver's preview of the family screen (no sending, no acks).
+function AlertBanner({ V, framed }: { V: ViewModel; framed: boolean }) {
+  const me = useApp(s => s.user?.uid);
+  const al = V.alerts[0] || null;
+  if (!al || V.now - al.at > 12 * 3600e3) return null;
+  const acked = !!(me && al.acks?.[me]);
+  return (
+    <Theme name="red">
+      <XStack role="alert" bg="$color9" rounded={22} p={16} gap={12} items="center" transition="bouncy" enterStyle={{ opacity: 0, scale: 0.95 }}>
+        <Siren size={26} color="$white1" />
+        <YStack flex={1} gap={2}>
+          <T v="eyebrow" color="$white1" opacity={0.9}>{`Important · ${M.hhmm(al.at)}`}</T>
+          <T v="label" color="$white1" fontSize={17}>{al.text}</T>
+        </YStack>
+        {!framed && !acked ? (
+          <XStack role="button" onPress={() => ackAlert(al.sid, al.id)} px={14} height={40} rounded={20} bg="$white1" items="center" pressStyle={{ scale: 0.95 }}>
+            <T v="label" color="$color11" weight="heavy">Got it</T>
+          </XStack>
+        ) : null}
+      </XStack>
+    </Theme>
+  );
+}
+
+// framed = the caregivers' preview of the family screen (no sending, no acks).
 export function FamilyScreen({ framed = false }: { framed?: boolean }) {
-  const t = useTheme();
   const { isTablet } = useLayout();
   const V = useView();
   const me = useApp(s => s.user?.uid);
   const lastVisit = useApp(s => s.lastVisit);
   const revealed = useApp(s => s.revealed);
-  const replyToId = useApp(s => s.replyTo);
-  const draft = useApp(s => s.drafts.familyNote || "");
-  // Choosing "Reply" puts the cursor straight in the message box, as the PWA does.
-  const input = useRef<TextInput>(null);
-  useEffect(() => { if (replyToId && !framed) input.current?.focus(); }, [replyToId, framed]);
 
-  const noteAllowed = !framed;
-  const e = V.latest;
-  const primary = M.entryCodes(e)[0];
-  const cat = t.cat(primary ? V.ctx.reg.CAT[primary] : undefined);
-  const al = V.alerts[0] || null;
-  const recent = !!al && V.now - al.at < 12 * 3600e3;
-  const who = e ? whoBy(e, V) : "";
-
-  // In time order: an entry sits at its interval (a box filled in later stays where it belongs), a message at
-  // when it was sent.
   const items = useMemo<FeedItem[]>(() => {
     const entries: FeedItem[] = [...V.D.entries, ...V.PD.entries]
       .filter(x => M.entryCodes(x).length || x.note)
@@ -77,197 +69,115 @@ export function FamilyScreen({ framed = false }: { framed?: boolean }) {
     return n + [it.t.root, ...it.t.replies].filter(m => isNew(m.at, m.uid)).length;
   }, 0);
 
-  const replyToThread = (noteAllowed && replyToId && V.threads.find(th => th.root.id === replyToId)) || null;
-  const replyText = replyToThread ? replyToThread.root.text || "" : "";
-
-  const renderItem = ({ item }: { item: FeedItem }) => {
+  const renderItem = ({ item, index }: { item: FeedItem; index: number }) => {
+    const prev = items[index - 1];
+    const day = M.dateKey(new Date(item.at));
+    const dayBreak = !prev || M.dateKey(new Date(prev.at)) !== day;
+    const heading = dayBreak ? (
+      <T v="eyebrow" px={20} pt={index ? 18 : 6} pb={6}>{day === M.dateKey(new Date(V.now)) ? "Today" : M.dayLong(item.at)}</T>
+    ) : null;
     if ("t" in item) {
       const th = item.t;
-      const isReplying = replyToThread?.root.id === th.root.id;
-      // A conversation reads like a chat: the first message and its replies in order, then "Reply".
       return (
-        <View
-          style={[
-            styles.thread,
-            { backgroundColor: t.c.ground, borderRadius: t.colorful ? 20 : t.r.md },
-            t.shadow,
-            t.colorful ? null : { borderWidth: 2, borderColor: t.c.edge },
-            isReplying && { borderWidth: 2, borderColor: t.c.accent },
-          ]}
-        >
-          <MessageBubble n={th.root} me={me} isNew={isNew(th.root.at, th.root.uid)} />
-          {th.replies.map(r => <MessageBubble key={r.id} n={r} me={me} isNew={isNew(r.at, r.uid)} />)}
-          {noteAllowed ? (
-            <Pressable accessibilityRole="button" onPress={() => setReplyTo(th.root.id)} hitSlop={8} style={styles.replyLink}>
-              <T v="label" color={t.c.accentInk}>
-                {th.replies.length ? "Reply" : `Reply to ${th.root.uid === me ? "your message" : th.root.who}`}
-              </T>
-            </Pressable>
-          ) : null}
-        </View>
+        <>
+          {heading}
+          <YStack
+            mx={16}
+            my={5}
+            pt={12}
+            px={10}
+            pb={4}
+            gap={8}
+            rounded={24}
+            bg="$card"
+            shadowColor="$shadowColor"
+            shadowOpacity={0.08}
+            shadowRadius={14}
+            shadowOffset={{ width: 0, height: 4 }}
+            elevation={2}
+          >
+            <MessageBubble n={th.root} me={me} isNew={isNew(th.root.at, th.root.uid)} />
+            {th.replies.map(r => <MessageBubble key={r.id} n={r} me={me} isNew={isNew(r.at, r.uid)} />)}
+            {!framed ? (
+              <XStack role="button" onPress={() => compose(th.root.id)} hitSlop={8} px={14} height={40} items="center" self="flex-start" pressStyle={{ opacity: 0.6 }}>
+                <T v="label" color="$accent11">Reply</T>
+              </XStack>
+            ) : null}
+          </YStack>
+        </>
       );
     }
     const x = item.x;
     const codes = M.entryCodes(x);
+    const cat = codes.includes("FL") ? "danger" : codes[0] ? V.ctx.reg.CAT[codes[0]] || null : null;
     const by = whoBy(x, V);
     const key = x.sid + x.id;
     const newFlag = isNew(x.markedAt, x.by);
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${M.hhmm(x.slotStart)}: ${M.entryLine(x, V.ctx, true)}`}
-        onPress={() => reveal(key)}
-        style={({ pressed }) => [
-          styles.feedline,
-          { backgroundColor: t.c.panel, borderLeftWidth: newFlag ? 3 : 0, borderLeftColor: t.c.accent },
-          pressed && { opacity: 0.85 },
-        ]}
-      >
-        <T v="small" color={t.c.mute} numberOfLines={1} style={{ width: M.clock.h12 ? 64 : 46 }}>{M.hhmm(x.slotStart)}</T>
-        <View style={{ flex: 1 }}>
-          <T weight={newFlag ? "bold" : undefined}>{M.entryLine(x, V.ctx, true)}</T>
-          {by ? <T v="small" color={t.c.mute}>{by}</T> : null}
-          {revealed[key] && codes.length ? (
-            <T v="small" color={t.c.mute} style={{ marginTop: 3 }}>
-              {`Clinical code${codes.length > 1 ? "s" : ""} ${codes.map(c => M.codeLabel(c, V.ctx)).join(", ")} · ${codes.map(c => M.codeText(c, V.ctx, false)).join("; ")}`}
-            </T>
-          ) : null}
-        </View>
-      </Pressable>
+      <>
+        {heading}
+        <XStack
+          role="button"
+          aria-label={`${M.hhmm(x.slotStart)}: ${M.entryLine(x, V.ctx, true)}${by ? `, by ${by}` : ""}. Tap to see the clinical code`}
+          onPress={() => reveal(key)}
+          mx={16}
+          my={3}
+          px={14}
+          py={12}
+          gap={12}
+          rounded={18}
+          bg={newFlag ? "$accent2" : "transparent"}
+          items="flex-start"
+          pressStyle={{ bg: "$color3" }}
+        >
+          <T v="small" fontSize={13} width={M.clock.h12 ? 64 : 46} pt={1} numberOfLines={1}>{M.hhmm(x.slotStart)}</T>
+          <Theme name={codes.length ? catTheme(cat) : "amber"}>
+            <YStack width={10} height={10} rounded={5} bg="$color9" mt={5} />
+          </Theme>
+          <YStack flex={1} gap={6}>
+            {codes.length || (x.pain && x.pain !== "—") ? (
+              <T weight={newFlag ? "heavy" : "semibold"} fontSize={16} lineHeight={21}>{M.codesLine(x, V.ctx, true)}</T>
+            ) : null}
+            {x.note ? <NoteCard text={x.note} /> : null}
+            {by ? <T v="small" fontSize={13}>{by}</T> : null}
+            {revealed[key] && codes.length ? (
+              <T v="small" fontSize={13} mt={3} transition="quick" enterStyle={{ opacity: 0 }}>
+                {`Code${codes.length > 1 ? "s" : ""} ${codes.map(c => M.codeLabel(c, V.ctx)).join(", ")} · ${codes.map(c => M.codeText(c, V.ctx, false)).join("; ")}`}
+              </T>
+            ) : null}
+          </YStack>
+        </XStack>
+      </>
     );
   };
 
   const header = (
-    <>
+    <YStack gap={14} px={16} pt={6} pb={8}>
+      <AlertBanner V={V} framed={framed} />
+      <NowCard V={V} />
       {newCount > 0 ? (
-        <View style={[styles.newcount, { backgroundColor: t.c.press, borderRadius: t.colorful ? t.r.pill : 0 }]}>
-          <T v="small" weight="black" color={t.c.accentInk}>{`${newCount} new since you last looked`}</T>
-        </View>
+        <XStack self="flex-start" bg="$accent3" px={14} py={6} rounded={999} transition="bouncy" enterStyle={{ scale: 0.9, opacity: 0 }}>
+          <T v="small" weight="black" color="$accent11">{`${newCount} new since you last looked`}</T>
+        </XStack>
       ) : null}
-      <T v="eyebrow" style={styles.sectionLabel}>Recent updates and messages</T>
-    </>
+    </YStack>
   );
-
-  // On a family phone the feed is the whole screen, edge to edge. It's a floating card on a tablet (centred, not
-  // stretched across a wide screen) and in the caregivers' "What family see" preview.
-  const floating = framed || isTablet;
-  const radius = floating ? t.r.lg : 0;
-  const card = (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: t.c.ground, borderRadius: radius },
-        floating ? (framed ? t.shadowLg : t.shadow) : null,
-        framed && !t.colorful ? { borderWidth: 2, borderColor: t.c.edge } : null,
-      ]}
-    >
-      <View style={[styles.head, { backgroundColor: cat.a, borderTopLeftRadius: radius, borderTopRightRadius: radius }]}>
-        <T v="eyebrow" color="#fff">{`${V.ctx.name} · right now`}</T>
-        <T v="big" color="#fff" style={{ marginTop: 6 }} accessibilityLiveRegion="polite">{nowText(e, V, true)}</T>
-        {nowDetail(e) ? <T color="rgba(255,255,255,0.92)" style={{ marginTop: 6 }}>{nowDetail(e)}</T> : null}
-        <View style={styles.metaRow}>
-          <T v="small" color="#fff" style={{ flex: 1 }}>{e ? `Updated ${M.agoText(e.markedAt)}${who ? " by " + who : ""}` : ""}</T>
-          <T v="small" color="#fff">{`${V.ctx.caregiver} is with ${V.ctx.pronouns.him}`}</T>
-        </View>
-      </View>
-      {recent && al ? (
-        <View accessibilityRole="alert" style={[styles.alert, { backgroundColor: t.c.danger }]}>
-          <T v="eyebrow" color={t.c.onDanger}>{`Important · ${M.hhmm(al.at)}`}</T>
-          <T v="label" color={t.c.onDanger}>{al.text}</T>
-          {noteAllowed && !(me && al.acks?.[me]) ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => ackAlert(al.sid, al.id)}
-              style={({ pressed }) => [styles.ackBtn, { borderColor: t.c.onDanger }, pressed && { opacity: 0.7 }]}
-            >
-              <T v="label" color={t.c.onDanger}>Got it</T>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      <FlatList
-        style={{ flex: 1 }}
-        data={items}
-        keyExtractor={it => ("x" in it ? `x:${it.x.sid}${it.x.id}` : `t:${it.t.root.id}`)}
-        extraData={[revealed, replyToId, newCount]}
-        renderItem={renderItem}
-        ListHeaderComponent={header}
-        ListFooterComponent={framed && !isTablet ? <RulesSection /> : null}
-        ListEmptyComponent={<T v="small" color={t.c.mute} style={{ padding: 14 }}>Nothing recorded yet.</T>}
-      />
-      {replyToThread ? (
-        <View style={[styles.replyingBar, { backgroundColor: t.cat("sleep").bg }]}>
-          <T numberOfLines={1} style={{ flex: 1 }} color={t.cat("sleep").ink} weight="bold">
-            {`Replying to ${replyToThread.root.uid === me ? "your message" : replyToThread.root.who}: "${replyText.slice(0, 60)}${replyText.length > 60 ? "…" : ""}"`}
-          </T>
-          <Pressable accessibilityRole="button" onPress={() => setReplyTo(null)} hitSlop={8}>
-            <T v="label" color={t.c.accentInk}>Cancel</T>
-          </Pressable>
-        </View>
-      ) : null}
-      <View
-        style={[
-          styles.compose,
-          {
-            borderTopColor: t.colorful ? t.c.line : t.c.edge,
-            borderTopWidth: t.colorful ? StyleSheet.hairlineWidth : 2,
-            paddingBottom: 10, // the tab bar below takes care of the home indicator
-            opacity: noteAllowed ? 1 : 0.6,
-          },
-        ]}
-      >
-        <Field
-          ref={input}
-          style={{ flex: 1 }}
-          value={draft}
-          onChangeText={v => setDraft("familyNote", v)}
-          placeholder={replyToThread ? "Write your reply…" : `Send ${V.ctx.caregiver} a message…`}
-          editable={noteAllowed}
-          accessibilityLabel={replyToThread ? "Reply" : "Message"}
-          autoCapitalize="sentences"
-          returnKeyType="send"
-          onSubmitEditing={noteAllowed ? sendFamilyNote : undefined}
-        />
-        <Button title="Send" kind="primary" small disabled={!noteAllowed} onPress={sendFamilyNote} />
-      </View>
-    </View>
-  );
-
-  if (framed && isTablet) {
-    return (
-      <Screen>
-        <KeyboardArea style={styles.framedTablet}>
-          <View style={{ flex: 1, maxWidth: 480 }}>{card}</View>
-          <View style={{ width: 320 }}><RulesSection /></View>
-        </KeyboardArea>
-      </Screen>
-    );
-  }
 
   return (
     <Screen>
-      <KeyboardArea>
-        <View style={{ flex: 1, width: "100%", maxWidth: isTablet ? 640 : undefined, alignSelf: "center", padding: floating ? 16 : 0 }}>
-          {card}
-        </View>
-      </KeyboardArea>
+      <YStack flex={1} width="100%" maxW={isTablet ? 680 : undefined} self="center">
+        <FlatList
+          style={{ flex: 1 }}
+          data={items}
+          keyExtractor={it => ("x" in it ? `x:${it.x.sid}${it.x.id}` : `t:${it.t.root.id}`)}
+          extraData={[revealed, newCount]}
+          renderItem={renderItem}
+          ListHeaderComponent={header}
+          ListEmptyComponent={<T v="small" px={20} py={14}>Nothing recorded yet.</T>}
+          contentContainerStyle={{ paddingBottom: framed ? 24 : 120 }}
+        />
+      </YStack>
+      {framed ? null : <Fab label="Write a message" actions={[{ label: "Write a message", icon: MessagesSquare, onPress: () => compose(null), tone: "primary" }]} />}
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  framedTablet: { flex: 1, flexDirection: "row", gap: 24, padding: 20 },
-  card: { flex: 1, overflow: "hidden" },
-  head: { padding: 18 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 10 },
-  alert: { padding: 14, gap: 3 },
-  ackBtn: { alignSelf: "flex-start", marginTop: 6, borderWidth: 2, paddingHorizontal: 14, paddingVertical: 8, minHeight: 40, justifyContent: "center" },
-  newcount: { marginHorizontal: 14, marginTop: 10, paddingHorizontal: 14, paddingVertical: 6, alignSelf: "flex-start" },
-  sectionLabel: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
-  feedline: { flexDirection: "row", gap: 10, marginHorizontal: 12, marginVertical: 6, padding: 14, borderRadius: 14 },
-  thread: { marginHorizontal: 12, marginVertical: 8, paddingTop: 12, paddingHorizontal: 10, paddingBottom: 2, gap: 8 },
-  replyLink: { paddingVertical: 8, paddingHorizontal: 14, minHeight: 40, justifyContent: "center", alignSelf: "flex-start" },
-  replyingBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  compose: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingTop: 10 },
-  rules: { gap: 12, padding: 14 },
-});

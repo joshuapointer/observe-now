@@ -169,12 +169,14 @@ maestro test e2e/practice-flow.yaml            # iPhone: shift, record, undo, me
 ```
 src/app/            routes (expo-router). Root layout gates by role and shift with Stack.Protected:
   (gate)/           sign in · verify email · who are you caring for · start a shift (PIN)
-  (care)/(tabs)/    caregiver: Record · Messages · Notes & medicines · This week · Settings
-  (care)/           fall report, codes editor, "What family see" preview
-  (family)/         family home + settings
+  (care)/(tabs)/    caregiver: Now · Messages · Care (medicines, notes)
+  (care)/           fall report, codes editor, "What family see" preview, settings, notes, the week's trends
+  (family)/(tabs)/  family: Updates · Messages · History
+  (family)/         family settings
 src/lib/            codes, model (ported 1:1 from the PWA), config, stores (Firebase + practice), PIN hash
 src/state/          app state (zustand), session/sync (Firestore listeners), actions, view model
-src/ui/             theme (Colorful/Classic × Light/Night), layout (tablet vs phone), primitives, shell
+src/ui/             Tamagui building blocks: primitives, sheet, floating tab bar, action button, shell
+tamagui.config.ts   design system: slate + indigo themes, a colour family per code category, Nunito, springs
 src/screens/        the screens
 ```
 
@@ -182,8 +184,15 @@ src/screens/        the screens
   change is that a patient's code list is passed around as a value (`ctx.reg`) instead of a global.
 - `src/state/actions.ts` holds every action from the PWA's `acts`/`forms`, with the same Firestore paths and
   fields. `src/state/session.ts` is the PWA's `sync()`.
-- **Tablets** (≥ 768 pt wide, iPad or Android) get two-pane layouts; **phones** get one column and a bottom tab
-  bar. Layout follows the screen, never the role.
+- **The UI is Tamagui** (v2, Reanimated driver) with Light and Night themes. Each code category has a colour
+  family (`src/ui/cat.ts`): sleep blue, mood purple, care orange, calm green, danger red. Animations (the tab
+  pill, sheets, the action button menu, toasts) run on the UI thread.
+- **Caregivers work from Now**: the current 15-minute box (tap to record), one-tap chips for codes used lately,
+  at most one alert (an unfinished fall report, or empty boxes), the day's boxes, and the last few entries. The
+  + button opens Record (the record sheet), Report a fall, Give a medicine, Write a note and Message family.
+  Ending a shift, switching person or mode, and Settings are in the person button in the header.
+- **Tablets** (≥ 768 pt wide, iPad or Android) get two-column layouts; **phones** get one column. Both have the
+  floating tab bar. Layout follows the screen, never the role.
 - **Caregivers share one care account per person being cared for**, signed in on as many phones or tablets as
   they use; each caregiver starts their shift by picking their name and PIN. Who's on shift lives on the patient
   record, so every care device shows the same shift and log, and ending it on one ends it everywhere. Family sign
@@ -194,7 +203,8 @@ src/screens/        the screens
 ## Differences from the PWA
 
 - Confirmations ("End Dana's shift?") are native dialogs, in the same words.
-- Settings is a tab (caregivers) or a screen (family) instead of a drop-down menu.
+- Settings is a page reached from the header's person button, instead of a drop-down menu.
+- One look (the PWA had Colorful and Classic); Light, Night or Auto remain.
 - Screen stays on via `expo-keep-awake` rather than the Wake Lock API.
 - No "Add to Home Screen" hint — it's an app.
 

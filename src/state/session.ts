@@ -148,8 +148,8 @@ export function selectPatient(pid: string | null) {
     pinFor: null, pin: "", pinError: "", cgForm: null, edit: null, codeForm: null, thread: null, replyTo: null,
     reg: buildRegistry(), // until this patient's own list arrives
     target: null, pendingCodes: [], trends: null, follow: true, sid: M.sidAt(Date.now()),
-    place: "", pain: "—", details: false, openSection: null, // half-filled entries belong to the patient they were started for
-    pickerOpen: false, addingPatient: false, modal: null, medForm: null, stripCollapsed: false,
+    place: "", pain: "—", details: false, // half-filled entries belong to the patient they were started for
+    pickerOpen: false, addingPatient: false, modal: null, medForm: null,
     drafts: pid && get().user ? kv.get(`gl:drafts:${get().user!.uid}:${pid}`, {}) : {},
     viewAs: pid && get().user ? kv.get(`gl:view:${get().user!.uid}:${pid}`, null) : null,
   });

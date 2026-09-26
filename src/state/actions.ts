@@ -53,7 +53,8 @@ export const openModal = (modal: ModalId) => set({ modal });
 export function closeModal() {
   const S = get();
   if (S.modal === "welcome") kv.set(welcomeKey(), true);
-  set({ modal: null, medForm: null, cgForm: S.modal === "caregivers" ? null : S.cgForm, edit: null });
+  if (S.modal === "record") return closeRecord();
+  set({ modal: null, medForm: null, cgForm: S.modal === "caregivers" ? null : S.cgForm, edit: null, replyTo: S.modal === "compose" ? null : S.replyTo });
 }
 
 // ---- the day being viewed ----
@@ -65,9 +66,25 @@ export function tapSlot(key: string) {
   if (!guard()) return;
   const v = V(), idx = Array.from({ length: v.info.slots }, (_, i) => M.slotKey(v.info, i)).indexOf(key);
   if (v.info.start + idx * M.SLOT_MS > Date.now()) return toast("That time hasn't come yet.");
-  const S = get();
-  set({ target: S.target === key || key === v.d.curKey ? null : key });
+  set({ target: key === v.d.curKey ? null : key, modal: "record" });
   tap();
+}
+
+// The record sheet: what's happening, for the current box (or the one chosen from the timeline).
+export function openRecord() {
+  if (!guard()) return;
+  set({ modal: "record" });
+}
+// Closing the sheet keeps anything already chosen, so a stray swipe doesn't lose it; Cancel clears it.
+export function closeRecord() {
+  set({ modal: null, ...(get().pendingCodes.length ? {} : { target: null, details: false }) });
+}
+// One tap on a "used lately" code saves it straight into the current box (with Undo).
+export function quickRecord(code: string) {
+  if (!guard()) return;
+  if (code === "FL") { confirmFall(); return; }
+  set({ pendingCodes: [code], target: null });
+  commit();
 }
 
 export function pick(code: string) {
@@ -78,18 +95,16 @@ export function pick(code: string) {
   tap();
 }
 export const unpick = (code: string) => set({ pendingCodes: get().pendingCodes.filter(c => c !== code) });
-export const toggleSection = (id: string) => set({ openSection: get().openSection === id ? null : id });
-export const toggleStrip = () => set({ stripCollapsed: !get().stripCollapsed });
 export const toggleDetails = () => set({ details: !get().details });
 export const setPlace = (v: string) => set({ place: get().place === v ? "" : v });
 export const setPain = (v: string) => set({ pain: get().pain === v ? "—" : v });
 export function cancelPending() {
-  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, openSection: null });
+  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, modal: null });
   clearDrafts("note");
 }
 export function backfillNext() {
   const v = V();
-  if (v.missed.length) set({ target: v.missed[0], pendingCodes: [] });
+  if (v.missed.length) set({ target: v.missed[0], pendingCodes: [], modal: "record" });
 }
 
 // FL asks first, so a stray tap can't alarm everyone.
@@ -108,7 +123,7 @@ async function markFall() {
   const codes = Array.from(new Set([...M.entryCodes(existing), ...S.pendingCodes, "FL"]));
   const data = { slot: v.targetIdx, slotStart: v.info.start + v.targetIdx * M.SLOT_MS, codes, place: existing?.place || S.place || "", pain: existing?.pain || "—", note: existing?.note || "", markedAt: now, ...byFields(), ...(existing?.med ? { med: true } : {}) };
   const answers = Object.fromEntries(FALL_QUESTIONS.map(([q]) => [q, null]));
-  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, openSection: null });
+  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, modal: null });
   clearDrafts("fallNarr", "note");
   router.navigate("/fall");
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
@@ -138,7 +153,7 @@ export async function commit() {
     const triggerCode = S.pendingCodes.find(c => alertKind(c, S.pain) === kind) || S.pendingCodes[0];
     ops.push({ path: `${dayPath(S.sid)}/alerts/${store().newId(`${dayPath(S.sid)}/alerts`)}`, data: { kind, code: triggerCode, text: M.alertText(kind, v.ctx, { pain: S.pain }), at: now, entryKey: v.key, acks: {} } as never, merge: false });
   }
-  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, openSection: null });
+  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, modal: get().modal === "record" ? null : get().modal });
   clearDrafts("note");
   done();
   const path = entryPath(S.sid, v.key), prev = existing && strip(existing);
@@ -319,7 +334,7 @@ export async function loadTrends() {
 
 // ---- shifts: the shared device stays signed in; whoever is on duty picks their name and enters their PIN ----
 function clearWorkInProgress() {
-  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, edit: null, openSection: null });
+  set({ pendingCodes: [], target: null, place: "", pain: "—", details: false, edit: null });
   // Everything half-typed goes with the caregiver who typed it, so the next one can't send it under their name.
   clearDrafts("note", "noteScreen", "reply", "newmsg");
 }
@@ -536,12 +551,14 @@ export function sendNew() {
   toast(from.role === "family" ? "Sent" : "Sent to family");
 }
 export const replyTo = (id: string | null) => set({ replyTo: id });
+// Family: the message sheet, for a new message or (with a thread id) a reply.
+export const compose = (threadId: string | null = null) => set({ replyTo: threadId, modal: "compose" });
 export function sendFamilyNote() {
   const S = get(), text = (S.drafts.familyNote || "").trim();
   if (!text || !S.member) return;
   const t: Thread | undefined = S.replyTo ? V().threads.find(x => x.root.id === S.replyTo) : undefined;
   clearDrafts("familyNote");
-  set({ replyTo: null });
+  set({ replyTo: null, modal: get().modal === "compose" ? null : get().modal });
   sendMessage(t ? t.root.sid : S.sid, { who: M.firstName(S.member.name), relation: S.member.relation || "", role: "family", text, ...(t ? { parentId: t.root.id } : {}) });
   toast(t ? "Reply sent" : "Sent");
 }

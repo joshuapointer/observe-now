@@ -1,14 +1,15 @@
-// Shared pieces for the gate screens: the centred-card frame, and the small bits every gate screen reuses
-// (link-style buttons, error text, the big tap-a-name rows).
+// Shared pieces for the gate screens (sign-in, choosing a person, starting a shift): the frame, link buttons,
+// error text, and the big tap-a-name rows.
 import type { ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { XStack, YStack } from "tamagui";
 
+import { ChevronRight } from "@/ui/icons";
 import { useLayout } from "@/ui/layout";
-import { Card, Row, Scroll, Screen, T } from "@/ui/primitives";
-import { useTheme } from "@/ui/theme";
+import { Scroll, Screen, T } from "@/ui/primitives";
 
-// Frame for every gate screen: a centred card on tablet, full width (with side padding) on phone. The gate
+// Frame for every gate screen: the app mark, then the content in a centred column (a card on tablets). The gate
 // route has no header or tab bar, so safe areas are handled here.
 export function GateLayout({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -19,80 +20,99 @@ export function GateLayout({ children }: { children: ReactNode }) {
         contentContainerStyle={{
           flexGrow: 1,
           justifyContent: "center",
-          paddingTop: insets.top + 20,
-          paddingBottom: insets.bottom + 20,
-          paddingLeft: insets.left + (isTablet ? 24 : 20),
-          paddingRight: insets.right + (isTablet ? 24 : 20),
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
+          paddingLeft: insets.left + 20,
+          paddingRight: insets.right + 20,
         }}
       >
-        <Card pad={isTablet ? 28 : 20} style={{ gap: 16, width: "100%", maxWidth: isTablet ? 520 : undefined, alignSelf: "center" }}>
+        <YStack
+          width="100%"
+          maxW={isTablet ? 500 : 460}
+          self="center"
+          gap={18}
+          bg={isTablet ? "$card" : "transparent"}
+          rounded={32}
+          p={isTablet ? 32 : 4}
+          shadowColor="$shadowColor"
+          shadowOpacity={isTablet ? 0.1 : 0}
+          shadowRadius={24}
+          shadowOffset={{ width: 0, height: 10 }}
+          transition="medium"
+          enterStyle={{ opacity: 0, y: 12 }}
+        >
+          <Image source={require("../../../assets/icon.png")} style={{ width: 64, height: 64, borderRadius: 16 }} accessibilityIgnoresInvertColors />
           {children}
-        </Card>
+        </YStack>
       </Scroll>
     </Screen>
   );
 }
 
-// An underlined text button ("linkbtn" in the PWA): switch auth mode, forgot password, sign out, etc.
+// A text button: switch sign-in method, forgot password, sign out, etc.
 export function LinkButton({ title, onPress, accessibilityLabel }: { title: string; onPress: () => void; accessibilityLabel?: string }) {
-  const t = useTheme();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || title}
-      onPress={onPress}
-      hitSlop={6}
-      style={({ pressed }) => [{ minHeight: 44, justifyContent: "center" }, pressed && { opacity: 0.6 }]}
-    >
-      <Text maxFontSizeMultiplier={1.4} style={[t.font("bold"), { color: t.c.accentInk, fontSize: 15, textDecorationLine: "underline" }]}>{title}</Text>
-    </Pressable>
+    <XStack role="button" aria-label={accessibilityLabel || title} onPress={onPress} hitSlop={6} minH={44} items="center" self="flex-start" pressStyle={{ opacity: 0.55 }}>
+      <T v="label" fontSize={16} color="$accent11">{title}</T>
+    </XStack>
   );
 }
 
 export function ErrorText({ children }: { children: string | undefined }) {
-  const t = useTheme();
   if (!children) return null;
   return (
-    <T v="small" color={t.c.dangerInk} accessibilityRole="alert">
-      {children}
-    </T>
+    <XStack bg="$red3" rounded={14} px={14} py={10} transition="quick" enterStyle={{ opacity: 0, y: -4 }}>
+      <T v="label" color="$red11" role="alert">{children}</T>
+    </XStack>
   );
 }
 
-// A big tap target for a person's name ("person pick" in the PWA): choosing a patient, or a caregiver to start
-// a shift.
+// A big tap target for a person's name: choosing a patient, or a caregiver to start a shift.
 export function PersonButton({ name, detail, onPress }: { name: string; detail?: string; onPress: () => void }) {
-  const t = useTheme();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={detail ? `${name}, ${detail}` : name}
+    <XStack
+      role="button"
+      aria-label={detail ? `${name}, ${detail}` : name}
       onPress={onPress}
-      style={({ pressed }) => [
-        {
-          minHeight: 64, borderRadius: t.r.md, borderWidth: t.colorful ? 0 : 2, borderColor: t.c.edge,
-          backgroundColor: pressed ? t.c.press : t.colorful ? t.c.panel : t.c.ground,
-          paddingHorizontal: 16, paddingVertical: 12, justifyContent: "center", gap: 3,
-        },
-        t.colorful && t.shadow,
-      ]}
+      minH={72}
+      px={16}
+      py={12}
+      gap={14}
+      items="center"
+      rounded={22}
+      bg="$card"
+      shadowColor="$shadowColor"
+      shadowOpacity={0.08}
+      shadowRadius={12}
+      shadowOffset={{ width: 0, height: 4 }}
+      elevation={2}
+      transition="quick"
+      pressStyle={{ scale: 0.98, bg: "$color3" }}
     >
-      <T weight="black" style={{ fontSize: 20, lineHeight: 24 }}>{name}</T>
-      {detail ? <T v="small">{detail}</T> : null}
-    </Pressable>
+      <YStack width={46} height={46} rounded={23} bg="$accent4" items="center" justify="center">
+        <T weight="black" fontSize={20} lineHeight={24} color="$accent11">{name.trim().slice(0, 1).toUpperCase()}</T>
+      </YStack>
+      <YStack flex={1} gap={2}>
+        <T weight="black" fontSize={20} lineHeight={25}>{name}</T>
+        {detail ? <T v="small" fontSize={13}>{detail}</T> : null}
+      </YStack>
+      <ChevronRight size={22} color="$color10" />
+    </XStack>
   );
 }
 
-// A numbered list ("ol.steps" in the PWA).
+// A numbered list.
 export function Steps({ items }: { items: string[] }) {
   return (
-    <View style={{ gap: 8 }}>
+    <YStack gap={10}>
       {items.map((s, i) => (
-        <Row key={i} gap={8} center={false}>
-          <T weight="heavy">{i + 1}.</T>
-          <T style={{ flex: 1 }}>{s}</T>
-        </Row>
+        <XStack key={i} gap={10} items="flex-start">
+          <YStack width={26} height={26} rounded={13} bg="$accent3" items="center" justify="center">
+            <T fontSize={13} lineHeight={16} weight="black" color="$accent11">{i + 1}</T>
+          </YStack>
+          <T flex={1}>{s}</T>
+        </XStack>
       ))}
-    </View>
+    </YStack>
   );
 }

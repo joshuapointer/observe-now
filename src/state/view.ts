@@ -83,11 +83,15 @@ export function compute(S: ViewInput, now: number) {
   // Unread: what the other side wrote. Caregiver mode counts family's messages, family mode the caregivers'.
   const fromOtherSide = (n: Message) => (actingAs(S) === "family" ? fromCaregiver(n) : !fromCaregiver(n)) && n.uid !== S.user?.uid;
   const unreadIds = new Set(threads.flatMap(t => [t.root, ...t.replies].filter(n => fromOtherSide(n) && n.at > readAt(t)).map(n => n.id)));
+  // The current 15-minute box: how far through it we are, for the countdown ring on Now.
+  const boxEnd = info.start + (d.cur + 1) * M.SLOT_MS;
+  const boxLeftMs = d.inToday ? Math.max(0, boxEnd - now) : 0;
+  const boxProgress = d.inToday ? 1 - boxLeftMs / M.SLOT_MS : 0;
   const feed = all.filter(e => M.entryCodes(e).length || e.note).sort((a, b) => b.markedAt - a.markedAt).slice(0, 40);
   return {
     missed, missedTimes, recents, pendingAlertKind, messages, threads, unreadIds, unreadMsgs: unreadIds.size, msgReadAt,
     now, info, D, PD, day, ctx, d, key, targetIdx, latest, alerts, members, family, live, careSeen, careActive, meds, onShift, roster: S.roster || [],
-    feed, plain: S.settings.plain, isToday,
+    feed, plain: S.settings.plain, isToday, boxLeftMs, boxProgress,
     isOwner: !!S.patient && S.patient.ownerUid === S.user?.uid,
     familyCount: family.length,
   };
