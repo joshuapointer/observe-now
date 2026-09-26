@@ -1,6 +1,6 @@
 // Security rules: who can register a patient, read invitations and join through one, for each way of signing in.
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, getDocs, collection, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, deleteDoc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeEach, describe, it } from "vitest";
@@ -92,4 +92,31 @@ describe("letting family also act as caregivers", () => {
     await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), "patients/p1/members/u-email"), { role: "caregiver" }));
     await assertSucceeds(getDocs(collection(as.email(), "patients/p1/shifts/2026-09-25/privateNotes")));
   });
+});
+
+describe("deleting an account", () => {
+  beforeEach(() => env.withSecurityRulesDisabled(async ctx => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "patients/p1/members/u-email"), { role: "family" });
+    await setDoc(doc(db, "patients/p1/shifts/2026-09-25"), { startedAt: 1 });
+    await setDoc(doc(db, "patients/p1/shifts/2026-09-25/entries/0100"), { codes: ["AS"] });
+    await setDoc(doc(db, "patients/p1/shifts/2026-09-25/familyNotes/n1"), { text: "hi", uid: "u-email" });
+    await setDoc(doc(db, "patients/p1/invitations/i1"), { path: "invitesByEmail/ellen@example.com/for/p1" });
+  }));
+  it("the owner can delete everything in their log, then the log", async () => {
+    const db = as.owner();
+    await assertSucceeds(deleteDoc(doc(db, "patients/p1/shifts/2026-09-25/entries/0100")));
+    await assertSucceeds(deleteDoc(doc(db, "patients/p1/shifts/2026-09-25/familyNotes/n1")));
+    await assertSucceeds(deleteDoc(doc(db, "patients/p1/shifts/2026-09-25")));
+    await assertSucceeds(deleteDoc(doc(db, "patients/p1/invitations/i1")));
+    await assertSucceeds(deleteDoc(doc(db, "patients/p1/members/u-email")));
+    await assertSucceeds(deleteDoc(doc(db, "patients/p1")));
+  });
+  it("family can leave, but can't delete the log or its entries", async () => {
+    await assertSucceeds(deleteDoc(doc(as.email(), "patients/p1/members/u-email")));
+    await assertFails(deleteDoc(doc(as.email(), "patients/p1")));
+    await assertFails(deleteDoc(doc(as.email(), "patients/p1/shifts/2026-09-25/entries/0100")));
+  });
+  it("nobody can remove someone else from a log except the owner", () =>
+    assertFails(deleteDoc(doc(as.phone(), "patients/p1/members/u-email"))));
 });

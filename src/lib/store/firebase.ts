@@ -2,7 +2,7 @@
 // GoogleService-Info.plist that app.config.ts bundles for the build's environment, not from code.
 import NetInfo from "@react-native-community/netinfo";
 import {
-  AppleAuthProvider, createUserWithEmailAndPassword, getAuth, getIdToken, onAuthStateChanged, reload,
+  AppleAuthProvider, createUserWithEmailAndPassword, deleteUser, getAuth, getIdToken, onAuthStateChanged, reload,
   sendEmailVerification, sendPasswordResetEmail, signInWithCredential, signInWithEmailAndPassword,
   signInWithPhoneNumber, signOut as fbSignOut, type ConfirmationResult, type User as FbUser,
 } from "@react-native-firebase/auth";
@@ -120,6 +120,15 @@ export function createFirebaseStore(): DataStore {
       for (const { path, data, merge = true } of ops) b.set(doc(db, path), stripUndefined(data), { merge });
       return acked(b.commit());
     },
+    // Waits for the server (not acked): an account is deleted only once its data is really gone.
+    async removeMany(paths) {
+      for (let i = 0; i < paths.length; i += 450) {
+        const b = writeBatch(db);
+        for (const path of paths.slice(i, i + 450)) b.delete(doc(db, path));
+        await b.commit();
+      }
+    },
+    async deleteUser() { if (auth.currentUser) await deleteUser(auth.currentUser); },
   };
 }
 

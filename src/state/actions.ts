@@ -489,7 +489,12 @@ export function invite(v: { contact: string; name: string; relation: string; det
     path = `invitesByPhone/${phone}`; shown = `${phone}. They sign in with that mobile number.`;
   }
   if (!v.name.trim()) { toast("Type their name first."); return false; }
-  run(store().setDoc(`${path}/for/${S.pid}`, { role: "family", digestOnly: false, name: v.name.trim(), relation: v.relation.trim(), detail: v.detail.trim(), patientName: S.patient?.name || "", invitedBy: uid(), at: Date.now() }, false));
+  const invitePath = `${path}/for/${S.pid}`;
+  run(store().batch([
+    { path: invitePath, data: { role: "family", digestOnly: false, name: v.name.trim(), relation: v.relation.trim(), detail: v.detail.trim(), patientName: S.patient?.name || "", invitedBy: uid(), at: Date.now() }, merge: false },
+    // Kept on the patient too, so deleting the log can withdraw it.
+    { path: `${PP()}/invitations/${store().newId(`${PP()}/invitations`)}`, data: { path: invitePath, at: Date.now() }, merge: false },
+  ]));
   toast(`Invited ${shown}`);
   return true;
 }
@@ -648,6 +653,70 @@ export async function signOut() {
   dropAll();
   set({ drafts: {}, toast: "", undo: null, modal: null });
   await store().signOut();
+}
+
+// ---- deleting an account ----
+// Everything under a log this account owns: every day (walking each date since the log began, since a family
+// message can sit under a day no caregiver opened), the roster, members, presence, shift history, and the
+// invitations it sent. Children first, the patient last, so the rules can still see who the owner is.
+async function ownedLogPaths(pid: string, createdAt: number) {
+  const st = store(), base = `patients/${pid}`, paths: string[] = [];
+  const days = await st.getCol<{ id: string }>(`${base}/shifts`);
+  const sids = new Set(days.map(d => d.id));
+  const first = Math.min(createdAt || Date.now(), ...days.map(d => M.dayInfo(d.id).start).filter(Number.isFinite));
+  for (let t = M.dayInfo(M.sidAt(first)).start; t <= Date.now(); t = M.dayInfo(M.nextSid(M.sidAt(t))).start) sids.add(M.sidAt(t));
+  const list = Array.from(sids);
+  for (let i = 0; i < list.length; i += 20) {
+    const chunk = await Promise.all(list.slice(i, i + 20).flatMap(sid =>
+      ["entries", "privateNotes", "familyNotes", "alerts"].map(c => st.getCol<{ id: string }>(`${base}/shifts/${sid}/${c}`).then(l => l.map(d => `${base}/shifts/${sid}/${c}/${d.id}`)))));
+    paths.push(...chunk.flat());
+  }
+  paths.push(...days.map(d => `${base}/shifts/${d.id}`));
+  for (const c of ["caregivers", "shiftLog", "presence"]) paths.push(...(await st.getCol<{ id: string }>(`${base}/${c}`)).map(d => `${base}/${c}/${d.id}`));
+  const invites = await st.getCol<{ id: string; path?: string }>(`${base}/invitations`);
+  paths.push(...invites.flatMap(i => [i.path, `${base}/invitations/${i.id}`].filter(Boolean) as string[]));
+  // Members last but the owner's own, which the rules need until the very end; then the owner, then the patient.
+  const members = await st.getCol<{ id: string }>(`${base}/members`);
+  paths.push(...members.filter(m => m.id !== uid()).map(m => `${base}/members/${m.id}`));
+  paths.push(`${base}/members/${uid()}`, base);
+  return paths;
+}
+
+export async function deleteAccount() {
+  const S = get(), me = uid();
+  if (!S.user) return;
+  const links = S.links || [];
+  const owned: { id: string; name: string; createdAt: number }[] = [];
+  for (const l of links) {
+    const p = await store().getDoc<{ ownerUid?: string; name?: string; createdAt?: number }>(`patients/${l.id}`).catch(() => null);
+    if (p?.ownerUid === me) owned.push({ id: l.id, name: p.name || l.name, createdAt: p.createdAt || 0 });
+  }
+  const logs = owned.length ? ` This also deletes ${owned.map(o => `${o.name}'s log`).join(" and ")}, with everything recorded in it, for everyone on it.` : "";
+  if (!(await ask({ title: "Delete your account?", body: `Your sign-in and your place on every log are removed.${logs} This can't be undone.`, yes: "Delete my account", no: "Keep it", destructive: true }))) return;
+  try {
+    set({ modal: null });
+    toast("Deleting your account…");
+    for (const o of owned) await store().removeMany(await ownedLogPaths(o.id, o.createdAt));
+    // Logs you follow (or care for, without owning): take yourself off them.
+    const followed = links.filter(l => !owned.some(o => o.id === l.id));
+    await store().removeMany(followed.flatMap(l => [`patients/${l.id}/presence/${me}`, `patients/${l.id}/members/${me}`]));
+    await store().removeMany(links.map(l => `users/${me}/patients/${l.id}`));
+    dropAll();
+    if (S.pid) kv.del(draftsKey(me, S.pid));
+    set({ drafts: {}, undo: null });
+    await store().deleteUser();
+    toast("Your account has been deleted");
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === "auth/requires-recent-login") {
+      // Everything is already gone except the sign-in itself, which Firebase only deletes just after a sign-in.
+      await store().signOut();
+      toast("Your information is deleted. To finish, sign in once more and choose Delete my account again.");
+      return;
+    }
+    if (__DEV__) console.warn("[deleteAccount]", e);
+    toast("Couldn't delete everything. Check the internet connection and try again.");
+  }
 }
 
 // ---- patients ----

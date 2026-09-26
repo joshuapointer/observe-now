@@ -53,7 +53,7 @@ export function T({ v = "body", color, center, weight, fontSize, lineHeight, ...
 const tap = () => Haptics.selectionAsync().catch(() => {});
 
 // ---------------------------------------------------------------- buttons
-export type ButtonKind = "default" | "primary" | "danger" | "done" | "ghost" | "soft";
+export type ButtonKind = "default" | "primary" | "danger" | "done" | "ghost" | "soft" | "destructive";
 type BtnProps = Omit<XStackProps, "children" | "grow"> & {
   title: string;
   kind?: ButtonKind;
@@ -74,6 +74,7 @@ const KINDS: Record<ButtonKind, { bg: ColorTokens; fg: ColorTokens; press: Color
   soft: { bg: "$accent3", fg: "$accent11", press: "$accent5" },
   done: { bg: "$color4", fg: "$color11", press: "$color4" },
   ghost: { bg: "transparent" as ColorTokens, fg: "$accent11", press: "$accent3" },
+  destructive: { bg: "transparent" as ColorTokens, fg: "$red11", press: "$red3" }, // a quiet red text button
 };
 
 export function Button({ title, kind = "default", big, small, sub, grow, icon: I, right, disabled, onPress, ...rest }: BtnProps) {

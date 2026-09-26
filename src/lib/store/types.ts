@@ -35,4 +35,6 @@ export interface DataStore {
   remove(path: string): Promise<void>;
   newId(path: string): string;
   batch(ops: Op[]): Promise<void>;
+  removeMany(paths: string[]): Promise<void>; // deletes in batches; used to delete a whole log
+  deleteUser(): Promise<void>; // the signed-in account itself; rejects with auth/requires-recent-login if it's been a while
 }

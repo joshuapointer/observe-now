@@ -106,5 +106,15 @@ export function createLocalStore(): DataStore {
       for (const { path, data: v, merge: m = true } of ops) write(path, v, m);
       persist(); notify();
     },
+    async removeMany(paths) { for (const p of paths) delete data[p]; persist(); notify(); },
+    // Practice mode has no real accounts: "deleting" one starts the practice data over.
+    async deleteUser() {
+      for (const k of Object.keys(data)) delete data[k];
+      kv.del(KEY);
+      seed(data);
+      user = null;
+      kv.del(USER_KEY);
+      authListeners.forEach(f => f(null));
+    },
   };
 }

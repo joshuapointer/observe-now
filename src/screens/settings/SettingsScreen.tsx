@@ -8,7 +8,7 @@ import { XStack, YStack } from "tamagui";
 import { DEMO } from "@/lib/config";
 import { activeCodes } from "@/lib/codes";
 import * as M from "@/lib/model";
-import { editMeds, openModal, setSetting, signOut } from "@/state/actions";
+import { deleteAccount, editMeds, openModal, setSetting, signOut } from "@/state/actions";
 import { actingAs, useApp, type Settings } from "@/state/app";
 import { useView } from "@/state/view";
 import { ChevronRight, CircleHelp, ListChecks, LogOut, Pill, Stethoscope, Users } from "@/ui/icons";
@@ -99,6 +99,12 @@ export function SettingsScreen() {
             <Card gap={12}>
               <T v="small">{`Signed in as ${who}${DEMO ? " · practice mode" : ""}${isFamily ? "" : ". This device stays signed in between shifts."}`}</T>
               <Button icon={LogOut} title={isFamily ? "Sign out" : "Sign this device out"} onPress={signOut} />
+              <Button kind="destructive" title="Delete my account" onPress={deleteAccount} />
+              <T v="small" fontSize={13}>
+                {isFamily
+                  ? "Removes your sign-in and takes you off every log you follow."
+                  : "Removes this sign-in, and deletes any log it set up, with everything recorded in it, for everyone on it."}
+              </T>
             </Card>
           </Section>
         </YStack>

@@ -1,0 +1,50 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Joshua Pointer",
+    "info": {
+      "en-US": {
+        "title": "Observe Now",
+        "subtitle": "Care log, shared with family",
+        "description": "Observe Now is a calm, shared record of how someone you care for is doing, built for families and caregivers looking after a person living with dementia.\n\nEvery 15 minutes, the caregiver on shift taps what's happening: asleep, restless, asking to go home, calm and occupied, in pain. One tap for the things you record most. Family see it straight away, in plain words, on their own phone.\n\nFOR CAREGIVERS\n• One shared log per person, on any iPhone, iPad or Android device the care team uses\n• Start a shift with your name and a PIN, so every entry says who recorded it\n• A clear picture of the day in 15-minute boxes, with empty ones flagged so nothing is missed\n• Medicines ticked off as they're given, notes for the next caregiver or for family\n• A fall report that alerts family at once, then records exactly what happened\n• The last seven nights at a glance: sleep, restlessness and falls, ready to show the nurse or doctor\n\nFOR FAMILY\n• What's happening right now, in everyday words\n• A red alert only when it matters: a fall, grabbing or pushing, or pain of 7 or more\n• Any day's history, box by box\n• Messages with the caregiver on shift\n\nPRIVATE BY DESIGN\nOnly the people on a care log can see it. No ads, no tracking, nothing sold. Notes can be kept for caregivers only.\n\nObserve Now is a record-keeping and communication tool. It is not a medical device, does not give medical advice, and is not an emergency service.",
+        "keywords": ["dementia", "caregiver", "care log", "alzheimer's", "sundowning", "family", "elder care", "carer", "behavior", "journal"],
+        "promoText": "A calm, shared picture of your loved one's day and night, for caregivers and family.",
+        "marketingUrl": "https://observenow.joshpointer.com",
+        "supportUrl": "https://observenow.joshpointer.com",
+        "privacyPolicyUrl": "https://observenow.joshpointer.com/privacy/",
+        "releaseNotes": "The first release of Observe Now."
+      }
+    },
+    "categories": ["MEDICAL", "HEALTH_AND_FITNESS"],
+    "advisory": {
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "INFREQUENT_OR_MILD",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE"
+    },
+    "review": {
+      "firstName": "Joshua",
+      "lastName": "Pointer",
+      "email": "privacy@joshpointer.com",
+      "phone": "",
+      "demoUsername": "+1 650 555 3434",
+      "demoPassword": "246810",
+      "demoRequired": true,
+      "notes": "Sign in with the mobile number +1 650 555 3434 and the code 246810 (a Firebase test number: no text is sent).\n\nA new account starts empty. To see the app:\n1. Tap \"Add this person\" and type any first name (for example Garth).\n2. Add a caregiver: any name and a 4-digit PIN (for example 1234). Tap your name and type the PIN to start a shift.\n3. On Now, tap the big card (or + then Record), choose what the person is doing, and Save.\n4. Settings (person icon, top right, then Settings) has Family (invite by email or mobile), Codes, Medicines and Delete my account.\n\nFamily members see the log on their own phone after being invited; the caregiver's \"What family see\" preview (Care tab) shows their view.\n\nSign in with Apple is also available. Account deletion: Settings, then Delete my account."
+    },
+    "release": {
+      "automaticRelease": false,
+      "phasedRelease": false
+    }
+  }
+}
