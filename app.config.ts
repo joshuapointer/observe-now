@@ -15,7 +15,7 @@ const VARIANTS = {
 const env = process.env.EXPO_PUBLIC_APP_ENV;
 const { name, suffix, firebase } = env === "prod" || env === "beta" ? VARIANTS[env] : VARIANTS.dev;
 const id = suffix ? `com.joshpointer.observenow.${suffix}` : "com.joshpointer.observenow";
-// Android isn't set up yet: only point at google-services.json once it has been downloaded into firebase/<env>/.
+// Android config per environment (firebase/<env>/google-services.json), downloaded for exactly that package name.
 const androidFirebase = `./firebase/${firebase}/google-services.json`;
 
 export default ({ config }: ConfigContext): ExpoConfig => ({

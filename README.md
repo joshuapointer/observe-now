@@ -184,6 +184,9 @@ src/screens/        the screens
   change is that a patient's code list is passed around as a value (`ctx.reg`) instead of a global.
 - `src/state/actions.ts` holds every action from the PWA's `acts`/`forms`, with the same Firestore paths and
   fields. `src/state/session.ts` is the PWA's `sync()`.
+- **Branding** comes from the icon's glass layers (`assets/brand/`, `src/ui/Brand.tsx`): the lens, the turning
+  aperture ring and the swirl mark on the splash, sign-in, loading and the intro. The native splash hands over
+  to an animated copy that flies the lens into place on the first screen (`src/ui/Splash.tsx`).
 - **The UI is Tamagui** (v2, Reanimated driver) with Light and Night themes. Each code category has a colour
   family (`src/ui/cat.ts`): sleep blue, mood purple, care orange, calm green, danger red. Animations (the tab
   pill, sheets, the action button menu, toasts) run on the UI thread.
@@ -222,8 +225,9 @@ src/screens/        the screens
 - **No store build has been made yet** — the EAS project, profiles and workflows exist, but the one-time setup
   above hasn't been run.
 - **Web** only runs practice mode now; the real backend needs the native SDK.
-- **Android was never run** — there's no Android SDK on the machine this was built on. It also needs each
-  environment's `google-services.json` in `firebase/<env>/`. The Android-specific spots (modal insets, keyboard,
-  edge-to-edge) were reviewed, but test the note field, message composer and modals on an emulator before relying
-  on it.
+- **Android runs** on a Pixel 9 emulator (`emulator -avd Pixel_9 &`, then `npx expo run:android`); each
+  environment's `google-services.json` is in `firebase/<env>/`. Firebase has the SHA fingerprints of the local debug
+  key and the EAS beta and prod keystores (phone sign-in needs them). Still to do for Play: a developer account, the
+  Play Console apps, a service account key in EAS for `eas submit -p android`, a manual first upload per app, then
+  Play's app signing fingerprints added in Firebase. Only sign-in has been tried on Android so far.
 - **Tested** on iPhone 17 and iPad Pro 13" simulators in practice mode (full caregiver and family flows).

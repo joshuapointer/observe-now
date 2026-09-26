@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "1016222315473",
+    "project_id": "behavior-observation-2d03f",
+    "storage_bucket": "behavior-observation-2d03f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1016222315473:android:fe9adfc89b3d301bb166f0",
+        "android_client_info": {
+          "package_name": "com.joshpointer.observenow"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1016222315473-sg7g40kf8npk548vv5lddhvnlq2l1tfn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCi1O_4kIY2lrMSL0BrlsSqb_lBylmxu0g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1016222315473-sg7g40kf8npk548vv5lddhvnlq2l1tfn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1016222315473-rfucuikofa3dfemto6h2o9ng22dm6q1u.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.joshpointer.observenow"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

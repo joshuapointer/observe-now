@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "150892806433",
+    "project_id": "garth-log-dev",
+    "storage_bucket": "garth-log-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:150892806433:android:393ddddcaa8bdb1adc7e60",
+        "android_client_info": {
+          "package_name": "com.joshpointer.observenow.beta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbz_qISlGMkknb9R9LcZn1wFp_gMLRf1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:150892806433:android:ad0a781a97441c2ddc7e60",
+        "android_client_info": {
+          "package_name": "com.joshpointer.observenow.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbz_qISlGMkknb9R9LcZn1wFp_gMLRf1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

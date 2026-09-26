@@ -8,6 +8,8 @@ import * as M from "@/lib/model";
 import { openModal, undo } from "@/state/actions";
 import { actingAs, useApp } from "@/state/app";
 import { useView } from "@/state/view";
+import { Lens } from "./Brand";
+import { SplashTarget } from "./Splash";
 import { CircleHelp, UserRound } from "./icons";
 import { IconButton, LiveDot, T } from "./primitives";
 import { TAB_BAR_HEIGHT } from "./TabBar";
@@ -37,7 +39,8 @@ export function AppHeader() {
   const saving = useApp(s => s.status.pending > 0 && s.status.online && actingAs(s) === "care");
   const line = useStatusLine();
   return (
-    <XStack bg="$page" pt={insets.top + 6} pb={8} pl={insets.left + 18} pr={insets.right + 10} items="center" gap={10}>
+    <XStack bg="$page" pt={insets.top + 6} pb={8} pl={insets.left + 14} pr={insets.right + 10} items="center" gap={10}>
+      <SplashTarget><Lens size={40} /></SplashTarget>
       <YStack flex={1} gap={2}>
         <XStack items="center" gap={8}>
           <T v="title" fontSize={26} numberOfLines={1} accessibilityRole="header" flexShrink={1}>{V.ctx.name}</T>

@@ -16,6 +16,7 @@ import { actingAs, hydrateApp, useApp, type AppState } from "@/state/app";
 import { boot } from "@/state/session";
 import { ModalHost } from "@/screens/modals/ModalHost";
 import { EnvTag, Toast } from "@/ui/shell";
+import { SplashOverlay } from "@/ui/Splash";
 import { useColors, useNight } from "@/ui/theme";
 import { config } from "../../tamagui.config";
 
@@ -42,7 +43,7 @@ export default function RootLayout() {
   }, []);
 
   const loaded = (fontsLoaded || !!fontError) && ready;
-  useEffect(() => { if (loaded) SplashScreen.hideAsync().catch(() => {}); }, [loaded]);
+  // The native splash is hidden by SplashOverlay once its animated copy of the lens is on screen.
 
   if (!loaded) return null;
   return <Themed />;
@@ -88,6 +89,7 @@ function RootNav() {
       </Stack>
       <ModalHost />
       <Toast />
+      <SplashOverlay />
       {mode === "gate" ? <EnvTag /> : null}
     </ThemeProvider>
   );

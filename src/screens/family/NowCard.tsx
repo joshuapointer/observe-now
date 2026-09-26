@@ -4,6 +4,7 @@ import { Theme, YStack } from "tamagui";
 
 import * as M from "@/lib/model";
 import { nowDetail, nowText, whoBy, type View as ViewModel } from "@/state/view";
+import { Watermark } from "@/ui/Brand";
 import { catTheme } from "@/ui/cat";
 import { T } from "@/ui/primitives";
 
@@ -27,7 +28,9 @@ export function NowCard({ V, compact }: { V: ViewModel; compact?: boolean }) {
         elevation={6}
         transition="medium"
         enterStyle={{ opacity: 0, scale: 0.97 }}
+        overflow="hidden"
       >
+        <Watermark size={compact ? 150 : 200} r={compact ? -40 : -50} b={compact ? -50 : -60} opacity={0.22} />
         <T v="eyebrow" color="$white1" opacity={0.85}>{`${V.ctx.name} · right now`}</T>
         <T v="hero" fontSize={compact ? 24 : 30} lineHeight={compact ? 29 : 35} color="$white1" accessibilityLiveRegion="polite">
           {nowText(e, V, true)}

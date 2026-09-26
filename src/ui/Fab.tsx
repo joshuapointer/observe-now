@@ -5,6 +5,7 @@ import { useState } from "react";
 import { StyleSheet } from "react-native";
 import { AnimatePresence, XStack, YStack } from "tamagui";
 
+import { Aperture } from "./Brand";
 import type { Icon } from "./icons";
 import { Plus } from "./icons";
 import { T } from "./primitives";
@@ -76,6 +77,10 @@ export function Fab({ label, actions }: { label: string; actions: FabAction[] })
             })
             : null}
         </AnimatePresence>
+        {/* The icon's aperture ring around the button; it twists as the menu opens. */}
+        <YStack position="absolute" r={-8} b={-8} width={80} height={80} rotate={open ? "120deg" : "0deg"} transition="bouncy" pointerEvents="none">
+          <Aperture size={80} seconds={0} />
+        </YStack>
         <YStack
           role="button"
           aria-label={open ? "Close menu" : label}

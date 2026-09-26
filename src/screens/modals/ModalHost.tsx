@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import type { TextInput } from "react-native";
 import { XStack, YStack } from "tamagui";
 
-import { APP_NAME } from "@/lib/config";
 import { PLACES, PAINS, type Med } from "@/lib/codes";
 import * as M from "@/lib/model";
 import type { Caregiver, Ctx, Entry, Member, OnShift, Patient } from "@/lib/types";
@@ -16,6 +15,7 @@ import {
 import { actingAs, useApp, type CgForm, type EditForm, type MedForm } from "@/state/app";
 import { msgWho, notAsked, useView, type View as ComputedView } from "@/state/view";
 import { CaregiverForm } from "@/screens/gate/CaregiverForm";
+import { Intro } from "@/screens/intro/Intro";
 import { RecordSheet } from "@/screens/record/RecordSheet";
 import { ChatBubble } from "@/ui/ChatBubble";
 import { ArrowLeftRight, Eye, Plus, Settings, UserRound, Users } from "@/ui/icons";
@@ -77,23 +77,6 @@ function helpFor(pathname: string, isFamily: boolean, V: ComputedView): [string,
     settings: ["Settings", ["Add caregivers and family, change the codes and medicines, and choose how the app looks."]],
   };
   return map[HELP_ROUTE[pathname] ?? ""] || map.now;
-}
-
-function welcomeFor(isFamily: boolean, V: ComputedView): string[] {
-  const n = V.ctx.name, c = V.ctx.caregiver;
-  if (isFamily) {
-    return [
-      `You'll see what ${n} is doing, kept up to date by ${c}.`,
-      "A red card means something important has happened.",
-      `Tap Message to write to ${c}.`,
-    ];
-  }
-  return [
-    `Every 15 minutes, tap the big card (or + then Record) and choose what ${n} is doing.`,
-    "Family see it on their phones, in plain words.",
-    `If ${n} falls, tap + then Report a fall. Family are alerted at once.`,
-    "When you finish, tap the person button at the top and End shift.",
-  ];
 }
 
 function Steps({ items }: { items: string[] }) {
@@ -410,10 +393,7 @@ export function ModalHost() {
         <Steps items={helpItems} />
         <Button kind="primary" big title="Got it" onPress={closeModal} />
       </Sheet>
-      <Sheet open={modal === "welcome"} onClose={closeModal} title={`Welcome to ${APP_NAME}`}>
-        <Steps items={welcomeFor(isFamily, V)} />
-        <Button kind="primary" big title="Let's go" onPress={closeModal} />
-      </Sheet>
+<Intro open={modal === "welcome"} />
       <Sheet open={modal === "meds"} onClose={closeModal} title={`Medicines for ${V.ctx.name}`}>
         <MedsBody medForm={medForm} meds={V.meds} />
       </Sheet>

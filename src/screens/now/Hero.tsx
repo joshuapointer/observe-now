@@ -1,7 +1,7 @@
 // The big card at the top of Now: the current 15-minute box, what's in it, and a ring counting down to the next.
 // Tapping it opens the record sheet.
-import Svg, { Circle } from "react-native-svg";
-import { Theme, XStack, YStack } from "tamagui";
+import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
+import { Theme, useTheme, XStack, YStack } from "tamagui";
 
 import * as M from "@/lib/model";
 import type { Entry } from "@/lib/types";
@@ -13,14 +13,21 @@ import { T } from "@/ui/primitives";
 import { useColors } from "@/ui/theme";
 
 function Ring({ progress, label, size = 64 }: { progress: number; label: string; size?: number }) {
-  const c = useColors();
+  const c = useColors(), t = useTheme();
   const stroke = 6, r = (size - stroke) / 2, len = 2 * Math.PI * r;
   return (
     <YStack width={size} height={size} items="center" justify="center">
       <Svg width={size} height={size} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
+        {/* The aperture ring's blue-to-aqua glass. */}
+        <Defs>
+          <LinearGradient id="aqua" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={t.aquaA.val as string} />
+            <Stop offset="1" stopColor={t.aquaB.val as string} />
+          </LinearGradient>
+        </Defs>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={c.line} strokeWidth={stroke} fill="none" />
         <Circle
-          cx={size / 2} cy={size / 2} r={r} stroke={c.accent} strokeWidth={stroke} fill="none" strokeLinecap="round"
+          cx={size / 2} cy={size / 2} r={r} stroke="url(#aqua)" strokeWidth={stroke} fill="none" strokeLinecap="round"
           strokeDasharray={`${len} ${len}`} strokeDashoffset={len * (1 - Math.min(1, Math.max(0, progress)))}
         />
       </Svg>

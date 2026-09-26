@@ -316,19 +316,31 @@ export function Badge({ n }: { n: number }) {
   );
 }
 
-// A dot that breathes while something is live.
+// The icon's signal light: a green LED that glows and breathes while something is live, grey when not.
 export function LiveDot({ on = true, size = 10 }: { on?: boolean; size?: number }) {
   const pulse = useSharedValue(1);
   useEffect(() => {
-    pulse.value = on ? withRepeat(withTiming(0.35, { duration: 900 }), -1, true) : 1;
+    pulse.value = on ? withRepeat(withTiming(0.45, { duration: 1100 }), -1, true) : 1;
   }, [on, pulse]);
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
   return (
-    <Theme name={on ? "green" : null}>
-      <Animated.View style={style}>
-        <YStack width={size} height={size} rounded={size / 2} bg={on ? "$color9" : "$color8"} />
-      </Animated.View>
-    </Theme>
+    <YStack width={size} height={size} items="center" justify="center">
+      {on ? (
+        <Animated.View style={[{ position: "absolute" }, style]}>
+          <YStack width={size * 2.2} height={size * 2.2} rounded={size * 1.1} bg="$signal" opacity={0.28} />
+        </Animated.View>
+      ) : null}
+      <YStack
+        width={size}
+        height={size}
+        rounded={size / 2}
+        bg={on ? "$signal" : "$color8"}
+        shadowColor="$signal"
+        shadowOpacity={on ? 0.9 : 0}
+        shadowRadius={size * 0.8}
+        shadowOffset={{ width: 0, height: 0 }}
+      />
+    </YStack>
   );
 }
 

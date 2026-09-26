@@ -13,7 +13,9 @@
       "icon": "./assets/ObserveNow.icon",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       },
       "entitlements": {
         "aps-environment": "development"
@@ -39,9 +41,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash-icon.png",
-          "imageWidth": 160,
-          "backgroundColor": "#201e1d"
+          "image": "./assets/brand/lens.png",
+          "imageWidth": 120,
+          "backgroundColor": "#f2f1f9",
+          "dark": {
+            "image": "./assets/brand/lens.png",
+            "backgroundColor": "#0b0c18"
+          }
         }
       ],
       "expo-localization",

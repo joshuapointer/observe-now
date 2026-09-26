@@ -1,7 +1,8 @@
-// The design system: slate neutrals, an indigo accent, one colour family per code category (see src/ui/cat.ts),
-// Nunito, and spring animations run on the UI thread by Reanimated.
+// The design system, taken from the app icon's glass: lavender-iris accent, a deep lens navy at night, a signal green
+// for "live", the aperture ring's blue-to-aqua, one colour family per code category (see src/ui/cat.ts), Nunito,
+// and spring animations run on the UI thread by Reanimated.
 import {
-  amber, amberDark, blue, blueDark, green, greenDark, indigo, indigoDark, orange, orangeDark, purple, purpleDark, red, redDark, slate, slateDark,
+  amber, amberDark, blue, blueDark, green, greenDark, orange, orangeDark, purple, purpleDark, red, redDark, slate, slateDark,
 } from "@tamagui/colors";
 import { createV5Theme, defaultConfig } from "@tamagui/config/v5";
 import { animationsReanimated } from "@tamagui/config/v5-reanimated";
@@ -31,12 +32,18 @@ const nunito = createFont({
 
 const palette = (o: Record<string, string>) => Object.values(o);
 
+// Iris: the lavender-blue of the icon's glass (Radix iris), used as the accent.
+const iris = ["#fdfdff", "#f8f8ff", "#f0f1fe", "#e6e7ff", "#dadcff", "#cbcdff", "#b8baf8", "#9b9ef0", "#5b5bd6", "#5151cd", "#5753c6", "#272962"];
+const irisDark = ["#13131e", "#171625", "#202248", "#262a65", "#303374", "#3d3e82", "#4a4a95", "#5958b1", "#5b5bd6", "#6e6ade", "#b1a9ff", "#e0dffe"];
+type Steps<N extends string> = { [K in `${N}${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`]: string };
+const named = <N extends string>(name: N, steps: string[]) => Object.fromEntries(steps.map((v, i) => [`${name}${i + 1}`, v])) as Steps<N>;
+
 const themes = createV5Theme({
   lightPalette: palette(slate),
   darkPalette: palette(slateDark),
   accent: {
-    light: Object.fromEntries(palette(indigo).map((v, i) => [`accent${i + 1}`, v])),
-    dark: Object.fromEntries(palette(indigoDark).map((v, i) => [`accent${i + 1}`, v])),
+    light: named("accent", iris),
+    dark: named("accent", irisDark),
   },
   childrenThemes: {
     blue: { light: blue, dark: blueDark },
@@ -44,7 +51,7 @@ const themes = createV5Theme({
     orange: { light: orange, dark: orangeDark },
     green: { light: green, dark: greenDark },
     red: { light: red, dark: redDark },
-    indigo: { light: indigo, dark: indigoDark },
+    indigo: { light: named("indigo", iris), dark: named("indigo", irisDark) }, // "no category": the brand's iris
     amber: { light: amber, dark: amberDark }, // notes
   },
 });
@@ -52,8 +59,9 @@ const themes = createV5Theme({
 // Two surfaces on top of the palette: the page behind everything, and the cards that sit on it (lighter than
 // the page in both light and dark). Every theme gets them, so a coloured sub-theme can still reach them.
 const surfaces = {
-  light: { page: slate.slate3, card: "#ffffff", cardLine: slate.slate5 },
-  dark: { page: slateDark.slate1, card: slateDark.slate3, cardLine: slateDark.slate5 },
+  // Light: a lavender mist. Night: the navy of the lens.
+  light: { page: "#f2f1f9", card: "#ffffff", cardLine: "#e3e2ef", signal: "#1fbf5c", aquaA: "#4a90c0", aquaB: "#4fb3a2" },
+  dark: { page: "#0b0c18", card: "#161728", cardLine: "#26273d", signal: "#2fe06f", aquaA: "#5aa2d0", aquaB: "#5fc8b4" },
 };
 const withSurfaces = Object.fromEntries(
   Object.entries(themes).map(([name, t]) => [name, { ...t, ...surfaces[name.startsWith("dark") ? "dark" : "light"] }]),

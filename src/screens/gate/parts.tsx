@@ -1,11 +1,12 @@
 // Shared pieces for the gate screens (sign-in, choosing a person, starting a shift): the frame, link buttons,
 // error text, and the big tap-a-name rows.
 import type { ReactNode } from "react";
-import { Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { XStack, YStack } from "tamagui";
 
+import { BrandEye, Watermark } from "@/ui/Brand";
 import { ChevronRight } from "@/ui/icons";
+import { SplashTarget } from "@/ui/Splash";
 import { useLayout } from "@/ui/layout";
 import { Scroll, Screen, T } from "@/ui/primitives";
 
@@ -13,9 +14,11 @@ import { Scroll, Screen, T } from "@/ui/primitives";
 // route has no header or tab bar, so safe areas are handled here.
 export function GateLayout({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
-  const { isTablet } = useLayout();
+  const { isTablet, width, height } = useLayout();
+  const big = Math.max(width, height);
   return (
-    <Screen>
+    <Screen overflow="hidden">
+      <Watermark size={big * 0.95} opacity={0.07} t={-big * 0.28} r={-big * 0.3} />
       <Scroll
         contentContainerStyle={{
           flexGrow: 1,
@@ -38,10 +41,10 @@ export function GateLayout({ children }: { children: ReactNode }) {
           shadowOpacity={isTablet ? 0.1 : 0}
           shadowRadius={24}
           shadowOffset={{ width: 0, height: 10 }}
-          transition="medium"
-          enterStyle={{ opacity: 0, y: 12 }}
         >
-          <Image source={require("../../../assets/icon.png")} style={{ width: 64, height: 64, borderRadius: 16 }} accessibilityIgnoresInvertColors />
+          <YStack self="center" mb={4}>
+            <SplashTarget ring><BrandEye size={isTablet ? 120 : 104} /></SplashTarget>
+          </YStack>
           {children}
         </YStack>
       </Scroll>
