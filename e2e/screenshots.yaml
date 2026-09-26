@@ -1,0 +1,80 @@
+# App Store screenshots. Runs against the release simulator build made with EXPO_PUBLIC_APP_ENV=demo
+# EXPO_PUBLIC_SCREENSHOTS=1 (practice mode with a recent history, no PRACTICE marker). See README → Screenshots.
+appId: com.joshpointer.observenow.dev
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "The care device"
+    timeout: 60000
+- tapOn: "The care device"
+- extendedWaitUntil:
+    visible: "Start a shift"
+    timeout: 20000
+- tapOn: "Dana R.*"
+- tapOn: "Digit 1"
+- tapOn: "Digit 2"
+- tapOn: "Digit 3"
+- tapOn: "Digit 4"
+- extendedWaitUntil:
+    visible: "Observe Now"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: 01-intro
+- tapOn: "Skip"
+- waitForAnimationToEnd
+- takeScreenshot: 02-now
+- tapOn: "Record and more"
+- waitForAnimationToEnd
+- takeScreenshot: 03-menu
+- tapOn: "Record"
+- extendedWaitUntil:
+    visible: "USED LATELY|Used lately"
+    timeout: 10000
+- tapOn: "Dozing off.*"
+- waitForAnimationToEnd
+- takeScreenshot: 04-record
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+- tapOn:
+    id: "tab-messages"
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "All"
+    commands:
+      - back
+- tapOn: "Ellen · daughter.*"
+- waitForAnimationToEnd
+- takeScreenshot: 05-messages
+- tapOn:
+    id: "tab-care"
+- waitForAnimationToEnd
+- takeScreenshot: 06-care
+- scrollUntilVisible:
+    element: "The last seven nights.*"
+    direction: DOWN
+- tapOn: "The last seven nights.*"
+- extendedWaitUntil:
+    visible: "WHAT THE WEEK SHOWS|What the week shows"
+    timeout: 15000
+- takeScreenshot: 07-week
+- tapOn: "Back"
+- tapOn: "You and this device"
+- tapOn: "Settings"
+- scrollUntilVisible:
+    element: "Sign this device out"
+    direction: DOWN
+- tapOn: "Sign this device out"
+- tapOn: "Yes, sign out"
+- tapOn: "Family \\(Ellen\\)"
+- extendedWaitUntil:
+    visible: "Skip"
+    timeout: 20000
+- tapOn: "Skip"
+- waitForAnimationToEnd
+- takeScreenshot: 08-family
+- tapOn:
+    id: "tab-history"
+- waitForAnimationToEnd
+- takeScreenshot: 09-history

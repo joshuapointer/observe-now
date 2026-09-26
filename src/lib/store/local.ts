@@ -1,8 +1,9 @@
 // Practice store: same interface as the Firebase one, kept on the device (AsyncStorage via kv).
 // Lets the app be tried out with nothing sent anywhere. Seed data matches the PWA's demo.
-import { PATIENT_ID } from "../config";
+import { PATIENT_ID, SCREENSHOTS } from "../config";
 import { DEFAULT_MEDS } from "../codes";
 import { kv } from "../kv";
+import { seedSample } from "./sample";
 import type { DataStore, SyncStatus, User } from "./types";
 
 const KEY = "garthlog:demo-db";
@@ -34,6 +35,7 @@ function seed(data: Record<string, Doc>) {
     data[`users/demo-caregiver/patients/${PATIENT_ID}`] = { name: "Garth", role: "caregiver" };
     data[`users/demo-family/patients/${PATIENT_ID}`] = { name: "Garth", role: "family" };
   }
+  if (SCREENSHOTS && !data[`${PP}/sampled`]) { seedSample(data, PATIENT_ID); data[`${PP}/sampled`] = { at: Date.now() }; }
   // Demo roster; both PINs are 1234.
   if (!Object.keys(data).some(p => p.startsWith(`${PP}/caregivers/`))) {
     data[`${PP}/caregivers/cg-dana`] = { name: "Dana R.", pin: "353ec585d7394d12063000aca56789dfd4eea70b1b759ea31906bf78b83e6bbd", createdAt: 0 };

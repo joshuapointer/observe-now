@@ -7,10 +7,12 @@ export type AppEnv = "dev" | "beta" | "prod" | "demo";
 const raw = process.env.EXPO_PUBLIC_APP_ENV;
 export const ENV: AppEnv = raw === "prod" || raw === "beta" || raw === "demo" ? raw : "dev";
 export const DEMO = ENV === "demo";
+// The App Store screenshot build: practice mode with a believable recent history and no PRACTICE marker.
+export const SCREENSHOTS = DEMO && process.env.EXPO_PUBLIC_SCREENSHOTS === "1";
 
 // The marker shown on every screen of anything that isn't production (null in production).
 export const ENV_TAG: { text: string; label: string } | null =
-  ENV === "prod" ? null
+  ENV === "prod" || SCREENSHOTS ? null
   : ENV === "demo" ? { text: "PRACTICE", label: "Practice mode" }
   : ENV === "beta" ? { text: "BETA", label: "Beta version" }
   : { text: "DEV", label: "Development version" };

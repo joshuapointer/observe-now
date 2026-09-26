@@ -18,9 +18,12 @@ const id = suffix ? `com.joshpointer.observenow.${suffix}` : "com.joshpointer.ob
 // Android config per environment (firebase/<env>/google-services.json), downloaded for exactly that package name.
 const androidFirebase = `./firebase/${firebase}/google-services.json`;
 
+// The App Store screenshot build shows the real app name wherever the system prints it (the iPad status bar).
+const shownName = process.env.EXPO_PUBLIC_SCREENSHOTS === "1" ? VARIANTS.prod.name : name;
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name,
+  name: shownName,
   slug: config.slug ?? "observe-now",
   scheme: suffix ? `observenow-${suffix}` : "observenow",
   ios: { ...config.ios, bundleIdentifier: id, googleServicesFile: `./firebase/${firebase}/GoogleService-Info.plist` },

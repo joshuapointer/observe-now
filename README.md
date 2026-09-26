@@ -164,6 +164,19 @@ maestro test e2e/practice-flow.yaml            # iPhone: shift, record, undo, me
                                                # settings, preview, fall report, then family: alert, reply
 ```
 
+## App Store screenshots
+
+`screenshots/iphone` (1320×2868, 6.9") and `screenshots/ipad` (2064×2752, 13") are made from practice mode with a
+believable recent history (`src/lib/store/sample.ts`), no PRACTICE marker, and the app named "Observe Now":
+
+```sh
+EXPO_PUBLIC_APP_ENV=demo EXPO_PUBLIC_SCREENSHOTS=1 npx expo prebuild --platform ios
+# build Release for the simulator (see e2e/screenshots.yaml for the device ids), install it, then:
+xcrun simctl spawn <device> launchctl setenv TZ Asia/Tokyo   # any zone where it's late afternoon: busier data
+maestro --device <device> test e2e/screenshots.yaml --test-output-dir /tmp/shots
+EXPO_PUBLIC_APP_ENV=dev npx expo prebuild --platform ios      # back to the dev project afterwards
+```
+
 ## How it's built
 
 ```

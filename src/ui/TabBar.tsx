@@ -63,6 +63,7 @@ export function TabBar({ state, navigation, items }: TabBarProps & { items: TabI
           return (
             <YStack
               key={route.key}
+              testID={`tab-${item.name}`}
               role="tab"
               aria-selected={focused}
               aria-label={item.badge ? `${item.label}, ${item.badge} new` : item.label}
