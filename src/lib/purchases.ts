@@ -5,11 +5,12 @@
 import { Platform } from "react-native";
 import type { PurchasesPackage } from "react-native-purchases";
 
-import { DEMO } from "./config";
+import { DEMO, SCREENSHOTS } from "./config";
 import { getStore as store } from "./store";
 
 const KEY = Platform.OS === "ios" ? process.env.EXPO_PUBLIC_RC_APPLE_KEY : process.env.EXPO_PUBLIC_RC_GOOGLE_KEY;
-export const PURCHASES_AVAILABLE = !DEMO && !!KEY;
+// The screenshot build shows the paywall with sample prices (for the App Store review screenshot); nothing is sold.
+export const PURCHASES_AVAILABLE = SCREENSHOTS || (!DEMO && !!KEY);
 
 export type Plan = { id: string; title: string; price: string; perMonth: string | null; period: "month" | "year" | "other"; pkg: PurchasesPackage };
 
@@ -24,7 +25,13 @@ async function asLog(pid: string) {
   return Purchases;
 }
 
+const SAMPLE_PLANS: Plan[] = [
+  { id: "annual", title: "Yearly", price: "$299.00", perMonth: "$24.92", period: "year", pkg: { product: { price: 299 } } as unknown as PurchasesPackage },
+  { id: "monthly", title: "Monthly", price: "$29.99", perMonth: null, period: "month", pkg: { product: { price: 29.99 } } as unknown as PurchasesPackage },
+];
+
 export async function loadPlans(pid: string): Promise<Plan[]> {
+  if (SCREENSHOTS) return SAMPLE_PLANS;
   const Purchases = await asLog(pid);
   const offering = (await Purchases.getOfferings()).current;
   return (offering?.availablePackages || []).map(pkg => {

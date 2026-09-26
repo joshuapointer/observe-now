@@ -35,7 +35,13 @@ function seed(data: Record<string, Doc>) {
     data[`users/demo-caregiver/patients/${PATIENT_ID}`] = { name: "Garth", role: "caregiver" };
     data[`users/demo-family/patients/${PATIENT_ID}`] = { name: "Garth", role: "family" };
   }
-  if (SCREENSHOTS && !data[`${PP}/sampled`]) { seedSample(data, PATIENT_ID); data[`${PP}/sampled`] = { at: Date.now() }; }
+  if (SCREENSHOTS && !data[`${PP}/sampled`]) {
+    seedSample(data, PATIENT_ID);
+    data[`${PP}/sampled`] = { at: Date.now() };
+    // Subscriptions switched on, with the trial nearly over, so the trial card and the paywall can be shown.
+    data["config/billing"] = { enforced: true };
+    data[PP] = { ...data[PP], trialStartedAt: Date.now() - 11 * 86400000 };
+  }
   // Demo roster; both PINs are 1234.
   if (!Object.keys(data).some(p => p.startsWith(`${PP}/caregivers/`))) {
     data[`${PP}/caregivers/cg-dana`] = { name: "Dana R.", pin: "353ec585d7394d12063000aca56789dfd4eea70b1b759ea31906bf78b83e6bbd", createdAt: 0 };
