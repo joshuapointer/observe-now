@@ -4,8 +4,35 @@
     "indexes": "firebase/firestore.indexes.json"
   },
   "emulators": {
-    "firestore": { "port": 8080 },
-    "ui": { "enabled": false },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    },
     "singleProjectMode": true
-  }
+  },
+  "hosting": [
+    {
+      "target": "site",
+      "public": "site",
+      "cleanUrls": true,
+      "trailingSlash": true,
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "strict-origin-when-cross-origin"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }

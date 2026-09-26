@@ -3,5 +3,15 @@
     "default": "garth-log-dev",
     "dev": "garth-log-dev",
     "prod": "behavior-observation-2d03f"
-  }
+  },
+  "targets": {
+    "behavior-observation-2d03f": {
+      "hosting": {
+        "site": [
+          "observenow-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
