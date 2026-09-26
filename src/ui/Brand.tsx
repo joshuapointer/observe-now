@@ -5,6 +5,7 @@ import { Image, type ImageStyle, type StyleProp } from "react-native";
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { YStack, type YStackProps } from "tamagui";
 
+import { SCREENSHOTS } from "@/lib/config";
 import { useNight } from "./theme";
 
 export const BRAND = {
@@ -15,11 +16,12 @@ export const BRAND = {
   markGreen: require("../../assets/brand/mark-green.png"),
 };
 
-// A slow, endless turn. `seconds` is one full revolution; pass 0 to hold still.
+// A slow, endless turn. `seconds` is one full revolution; pass 0 to hold still. The screenshot build holds everything
+// still, so the automation can tell when a screen has settled.
 function useSpin(seconds: number, reverse = false) {
   const turn = useSharedValue(0);
   useEffect(() => {
-    if (!seconds) return;
+    if (!seconds || SCREENSHOTS) return;
     turn.value = withRepeat(withTiming(1, { duration: seconds * 1000, easing: Easing.linear }), -1, false);
     return () => cancelAnimation(turn);
   }, [seconds, turn]);
@@ -30,7 +32,7 @@ function useSpin(seconds: number, reverse = false) {
 function useBreath(on: boolean) {
   const s = useSharedValue(1);
   useEffect(() => {
-    if (!on) return;
+    if (!on || SCREENSHOTS) return;
     s.value = withRepeat(withTiming(1.04, { duration: 1800, easing: Easing.inOut(Easing.quad) }), -1, true);
     return () => cancelAnimation(s);
   }, [on, s]);

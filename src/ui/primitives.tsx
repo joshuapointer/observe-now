@@ -9,6 +9,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } fr
 import { Input, Text, TextArea, Theme, XStack, YStack, type ColorTokens, type TextProps, type XStackProps, type YStackProps } from "tamagui";
 
 import type { Cat } from "@/lib/codes";
+import { SCREENSHOTS } from "@/lib/config";
 import { catColor, catTheme } from "./cat";
 import type { Icon } from "./icons";
 
@@ -321,7 +322,7 @@ export function Badge({ n }: { n: number }) {
 export function LiveDot({ on = true, size = 10 }: { on?: boolean; size?: number }) {
   const pulse = useSharedValue(1);
   useEffect(() => {
-    pulse.value = on ? withRepeat(withTiming(0.45, { duration: 1100 }), -1, true) : 1;
+    pulse.value = on && !SCREENSHOTS ? withRepeat(withTiming(0.45, { duration: 1100 }), -1, true) : 1;
   }, [on, pulse]);
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
   return (
