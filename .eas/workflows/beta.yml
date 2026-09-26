@@ -1,7 +1,7 @@
-# Every push to `beta` for "Observe Now Beta" (dev backend): a new native build goes to TestFlight.
-# If nothing native changed since the last build (same fingerprint), it publishes an over-the-air update to the
-# "beta" channel instead, which installed apps download on their next launch. Android is below.
-name: Beta to TestFlight
+# Every push to `beta` ships "Observe Now Beta" (dev backend) to TestFlight and Firebase App Distribution.
+# Each platform checks its fingerprint first. If nothing native changed since its last build, it publishes an
+# over-the-air update to the "beta" channel instead, which installed apps download on their next launch.
+name: Beta release
 
 on:
   push:
@@ -12,6 +12,7 @@ jobs:
     type: fingerprint
     environment: preview
 
+  # iOS: a new build goes to App Store Connect / TestFlight.
   get_ios_build:
     type: get-build
     needs: [fingerprint]
@@ -45,11 +46,48 @@ jobs:
       platform: ios
       channel: beta
 
-  # Android installs come from Firebase App Distribution (the beta-apk build, made by hand). Updates only reach
-  # builds with the same fingerprint, so publishing every time is safe: after a native change it waits for a new APK.
+  # Android: a new APK goes to Firebase App Distribution (the "testers" group in garth-log-dev).
+  get_android_build:
+    type: get-build
+    needs: [fingerprint]
+    params:
+      platform: android
+      profile: beta-apk
+      fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+      wait_for_in_progress: true
+
+  build_android:
+    type: build
+    needs: [get_android_build]
+    if: ${{ !needs.get_android_build.outputs.build_id }}
+    params:
+      platform: android
+      profile: beta-apk
+
+  distribute_android:
+    needs: [build_android]
+    environment: preview
+    env:
+      NOTES: ${{ github.commit_message }}
+    steps:
+      - uses: eas/download_build
+        id: apk
+        with:
+          build_id: ${{ needs.build_android.outputs.build_id }}
+          extensions: [apk]
+      - name: Upload to Firebase App Distribution
+        run: |
+          echo "$FIREBASE_DISTRIBUTION_KEY" | base64 -d > "$HOME/firebase-key.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/firebase-key.json"
+          npx -y firebase-tools@latest appdistribution:distribute "${{ steps.apk.outputs.artifact_path }}" \
+            --app 1:150892806433:android:393ddddcaa8bdb1adc7e60 --project garth-log-dev --groups testers \
+            --release-notes "${NOTES:-Build from $EAS_BUILD_ID}"
+          rm -f "$HOME/firebase-key.json"
+
   update_android:
     type: update
-    needs: [fingerprint]
+    needs: [get_android_build]
+    if: ${{ needs.get_android_build.outputs.build_id }}
     environment: preview
     params:
       platform: android
