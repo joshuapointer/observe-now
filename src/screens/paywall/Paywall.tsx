@@ -98,8 +98,11 @@ export function Paywall({ open }: { open: boolean }) {
     if (!pid || !plan) return;
     setBusy("buy"); setError("");
     try {
-      const ok = await buy(pid, plan);
-      if (ok) { closeModal(); toast(`Thank you. ${V.ctx.name}'s log is subscribed.`); }
+      const ent = await buy(pid, plan);
+      if (ent) {
+        useApp.setState({ entitlement: ent });
+        if (ent.active) { closeModal(); toast(`Thank you. ${V.ctx.name}'s log is subscribed.`); }
+      }
     } catch (e) { setError("The purchase didn't go through. Nothing was charged. Try again in a moment."); if (__DEV__) console.warn(e); }
     setBusy("");
   };
@@ -107,8 +110,9 @@ export function Paywall({ open }: { open: boolean }) {
     if (!pid) return;
     setBusy("restore"); setError("");
     try {
-      const ok = await restore(pid);
-      if (ok) { closeModal(); toast("Subscription restored."); } else setError(`No subscription was found for ${V.ctx.name}'s log on this ${Platform.OS === "ios" ? "Apple ID" : "Google account"}.`);
+      const ent = await restore(pid);
+      useApp.setState({ entitlement: ent });
+      if (ent.active) { closeModal(); toast("Subscription restored."); } else setError(`No subscription was found for ${V.ctx.name}'s log on this ${Platform.OS === "ios" ? "Apple ID" : "Google account"}.`);
     } catch (e) { setError("Couldn't restore right now. Check the connection and try again."); if (__DEV__) console.warn(e); }
     setBusy("");
   };

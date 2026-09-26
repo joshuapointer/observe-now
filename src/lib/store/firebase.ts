@@ -1,11 +1,10 @@
 // React Native Firebase (the native iOS/Android SDKs). Which project it talks to comes from the
 // GoogleService-Info.plist that app.config.ts bundles for the build's environment, not from code.
 import NetInfo from "@react-native-community/netinfo";
-import { getApp } from "@react-native-firebase/app";
 import {
   AppleAuthProvider, createUserWithEmailAndPassword, deleteUser, getAuth, getIdToken, onAuthStateChanged, reload,
   sendEmailVerification, sendPasswordResetEmail, signInWithCredential, signInWithEmailAndPassword,
-  signInWithPhoneNumber, signOut as fbSignOut, type ConfirmationResult, type User as FbUser,
+  signOut as fbSignOut, type User as FbUser,
 } from "@react-native-firebase/auth";
 import {
   collection, deleteDoc, doc, serverTimestamp, getDoc as fbGetDoc, getDocs, getFirestore, onSnapshot, setDoc as fbSetDoc,
@@ -13,17 +12,11 @@ import {
 } from "@react-native-firebase/firestore";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
-import * as Device from "expo-device";
 
 import type { DataStore, SyncStatus, User } from "./types";
 
 export function createFirebaseStore(): DataStore {
   const auth = getAuth();
-  // Phone sign-in proves it's really this app with a silent APNs push (the key is uploaded in each Firebase
-  // project), falling back to a reCAPTCHA page when no push arrives. A simulator never gets that push, so in
-  // development there only the console's test numbers are used and verification is skipped. Real devices,
-  // and every release build, always verify.
-  if (__DEV__ && !Device.isDevice) auth.settings.appVerificationDisabledForTesting = true;
   // The native SDK keeps a persistent on-disk cache by default, so writes made offline survive a restart.
   const db = getFirestore();
 
@@ -52,8 +45,6 @@ export function createFirebaseStore(): DataStore {
     verified: u.emailVerified || !!u.phoneNumber || u.providerData.some(p => p.providerId === "apple.com"),
   };
 
-  let confirmation: ConfirmationResult | null = null;
-
   return {
     demo: false,
 
@@ -62,12 +53,6 @@ export function createFirebaseStore(): DataStore {
     async signUp(email, pw) {
       const cred = await createUserWithEmailAndPassword(auth, email, pw);
       await sendEmailVerification(cred.user);
-    },
-    async sendPhoneCode(phone) { confirmation = await signInWithPhoneNumber(auth, phone); },
-    async confirmPhoneCode(code) {
-      if (!confirmation) throw Object.assign(new Error("No code was sent"), { code: "auth/missing-verification-id" });
-      await confirmation.confirm(code);
-      confirmation = null;
     },
     async signInWithApple() {
       // Apple gets the hash of the nonce; Firebase gets the raw one and checks they match.
@@ -117,8 +102,6 @@ export function createFirebaseStore(): DataStore {
     remove: path => acked(deleteDoc(doc(db, path))),
     newId: path => doc(collection(db, path)).id,
     serverTime: () => serverTimestamp(),
-    projectId: getApp().options.projectId || null,
-    idToken: async () => (auth.currentUser ? getIdToken(auth.currentUser) : null),
     batch(ops) {
       const b = writeBatch(db);
       for (const { path, data, merge = true } of ops) b.set(doc(db, path), stripUndefined(data), { merge });

@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { DEFAULT_REGISTRY, type Registry } from "@/lib/codes";
 import { kv } from "@/lib/kv";
 import * as M from "@/lib/model";
+import type { Entitlement } from "@/lib/purchases";
 import type { SyncStatus, User } from "@/lib/store";
 import type { Caregiver, DayData, Invite, Link, Member, Patient, Presence } from "@/lib/types";
 
@@ -34,8 +35,6 @@ export type AppState = {
   authReady: boolean;
   user: User | null;
   authMode: "signin" | "signup";
-  authMethod: "email" | "phone";
-  phoneSentTo: string; // E.164 number the last text code went to; "" until one is sent
   authError: string;
   authBusy: boolean;
 
@@ -86,6 +85,7 @@ export type AppState = {
   trends: Trends | null;
 
   billingEnforced: boolean; // config/billing.enforced: subscriptions are switched on
+  entitlement: Entitlement | null; // RevenueCat's answer for the open log (caregivers only); null until it answers
   toast: string;
   undo: (() => Promise<unknown>) | null;
   status: SyncStatus;
@@ -103,14 +103,14 @@ export const initialSession = (): Partial<AppState> => ({
 
 export const useApp = create<AppState>(() => ({
   ...(initialSession() as AppState),
-  authReady: false, user: null, authMode: "signin", authMethod: "phone", phoneSentTo: "", authError: "", authBusy: false,
+  authReady: false, user: null, authMode: "signin", authError: "", authBusy: false,
   follow: true, sid: M.sidAt(Date.now()),
   drafts: {},
   settings: DEFAULT_SETTINGS,
   threadRead: {},
   lastVisit: 0,
   revealed: {},
-  toast: "", undo: null, billingEnforced: false,
+  toast: "", undo: null, billingEnforced: false, entitlement: null,
   status: { online: true, pending: 0, lastSync: 0 },
 }));
 

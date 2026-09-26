@@ -57,37 +57,25 @@ committed. Dev is the default so a stray build can never write to prod.
 
 ### Signing in
 
-Three ways, all Firebase Auth. The sign-in screen opens on the mobile number, with Sign in with Apple below it
-and "Use email instead" for email and password.
+Two ways, both Firebase Auth, on the free Spark plan (no text messages, no Cloud Functions):
 
-- **Email and password**, with the emailed verification link (as in the PWA).
+- **Email and password**, with the emailed verification link.
 - **Sign in with Apple** (iOS): `expo-apple-authentication` → Firebase `apple.com` credential. Apple accounts
   arrive with a verified email; "Hide My Email" gives a `privaterelay.appleid.com` address, so invite those people
-  by that address or by phone.
-- **Mobile number + texted 6-digit code**: Firebase phone auth. New and returning people use the same two steps.
-  Numbers are stored as E.164 (`+14155550123`); a 10-digit number is read as +1 on a US/Canadian device.
-  On a **simulator** the dev app skips app verification, so only the console's test numbers work there (no web
-  page, no real SMS); real devices and release builds always verify.
+  by that address.
 
-Family can be invited by email *or* mobile number (`invitesByEmail/{email}` / `invitesByPhone/{+E.164}`), and
-the Firestore rules treat a phone-number account as verified.
+Family are invited by email (`invitesByEmail/{email}`); they sign up with that address, or with Apple using it.
+Phone sign-in was removed (real texts need the Blaze plan). Accounts made with it earlier can't sign in any more.
 
 **Firebase / Apple setup each backend needs** (both projects unless noted):
 
-1. **Blaze plan** — phone auth bills per SMS.
-2. Authentication → Sign-in method: enable **Phone** and **Apple**. Add test numbers under Phone for development.
-3. Project settings → add the iOS apps (`.dev` and `.beta` in `garth-log-dev`, `com.joshpointer.observenow` in
+1. Authentication → Sign-in method: enable **Email/Password** and **Apple**.
+2. Project settings → add the iOS apps (`.dev` and `.beta` in `garth-log-dev`, `com.joshpointer.observenow` in
    prod) and put each `GoogleService-Info.plist` in `firebase/<env>/`.
-4. Upload an **APNs auth key** (Apple Developer → Keys; environment *Sandbox & Production*) under Project
-   settings → Cloud Messaging → Apple app configuration, **once per iOS app** — each bundle id has its own slot
-   (`.dev` and `.beta` in `garth-log-dev`, the prod app in `behavior-observation-2d03f`). A missing one doesn't
-   error: that app just always gets the reCAPTCHA page. With it, phone sign-in on a real device proves it's the real app with a silent push — no web page;
-   the app carries the push entitlement and `remote-notification` background mode for this (`app.json`). If no
-   push arrives, Firebase falls back to a reCAPTCHA page, which returns to the app on a `…://firebaseauth/…` link
-   that `src/app/+native-intent.tsx` keeps away from the router.
-5. Authentication → Settings → **SMS region policy**: allow every country your people use. New projects allow
-   none, which fails even for test numbers ("SMS unable to be sent until this region enabled").
-6. Deploy the rules (see *Firestore rules* below).
+3. Deploy the rules (see *Firestore rules* below).
+
+**App Review** signs in with a verified email account in prod. Its login and the review contact number live in
+`store/review.local.json` (not committed: this repository is public), which `store.config.js` reads.
 
 ## Branches and releases
 
@@ -151,7 +139,7 @@ Use the repo's Firebase CLI (`npx firebase …`, installed as a dev dependency) 
 ```sh
 npm run typecheck
 npm run lint
-npm test          # model, codes, phone numbers, and PIN-hash parity with the PWA
+npm test          # model, codes, billing, and PIN-hash parity with the PWA
 npm run test:rules  # Firestore security rules, in the emulator
 mise run check    # typecheck, lint, test
 ```
@@ -170,27 +158,19 @@ One subscription per care log (family never pay): a 14-day free trial from when 
 or yearly through the App Store or Google Play, managed by RevenueCat. Each log is its own RevenueCat customer,
 `log_<patient id>`, so the subscription belongs to the log and every caregiver device sees it.
 
-- **The server decides.** `patients/{id}.billing` is written only by Cloud Functions (`functions/index.js`):
-  `revenuecatWebhook` (RevenueCat → on every purchase, renewal, cancellation, refund) and `syncBilling` (the app,
-  right after a purchase or restore). `stampTrial` stamps the trial start on logs from app versions that don't.
-- **The rules enforce it**, but only once `config/billing` has `enforced: true` (set it in the Firestore console).
-  A lapsed log keeps everything readable, messages working and deletion possible; only new recording stops, and
-  **a fall can always be reported**.
+- **The app decides**, from RevenueCat's `care_log` entitlement for the open log (`src/lib/purchases.ts`,
+  refreshed when a log opens and when the app comes back to the foreground) and the log's trial start, which the
+  rules make the server stamp (`trialStartedAt == request.time`) and nobody can reset. There's no server step, so
+  the Blaze plan isn't needed; the trade-off is that a modified app could skip the paywall.
+- **Nothing is enforced until `config/billing` has `enforced: true`** (set it in the Firestore console). A lapsed
+  log stays readable, messages keep working and it can still be deleted; the app only stops new recording, and a
+  fall can always be reported.
 - **The app** shows a trial or renewal card on Now, a Subscription section in Settings, and the paywall
-  (`src/screens/paywall`). Purchases are off until the RevenueCat public keys are set: `EXPO_PUBLIC_RC_APPLE_KEY`
-  and `EXPO_PUBLIC_RC_GOOGLE_KEY` in each `eas.json` build profile's `env`.
+  (`src/screens/paywall`). Purchases need the RevenueCat public keys: `EXPO_PUBLIC_RC_APPLE_KEY` (set, in each
+  `eas.json` build profile and in `.env` for local servers) and `EXPO_PUBLIC_RC_GOOGLE_KEY` (Android, later).
 
-Setup, once per Firebase project (dev, then prod), after the project is on the Blaze plan:
-
-```sh
-npx firebase functions:secrets:set REVENUECAT_SECRET_KEY --project prod    # RevenueCat secret API key (sk_…)
-npx firebase functions:secrets:set REVENUECAT_WEBHOOK_AUTH --project prod  # any long random string
-npx firebase deploy --only functions --project prod
-```
-
-Then in RevenueCat: add the webhook `https://us-central1-<project>.cloudfunctions.net/revenuecatWebhook` with that
-same string as its Authorization header; an entitlement `care_log`; an offering with monthly and annual packages.
-In App Store Connect and Play Console: the subscription products (one subscription group), linked in RevenueCat.
+RevenueCat setup: an entitlement `care_log`; an offering with monthly and annual packages; the App Store (and later
+Play) subscription products in one group, linked in RevenueCat.
 
 ## App Store screenshots
 
@@ -261,15 +241,10 @@ src/screens/        the screens
 - **Offline**: the native Firestore SDK keeps a persistent on-disk cache, so entries made offline survive the app
   closing and are sent when the connection returns. The app still only acts on server answers for the one
   dangerous case (an offline cold start mistaking "no data" for "you've lost access").
-- **Phone and Apple sign-in haven't run against a real Firebase project yet** — they need the console setup in
-  *Signing in* above. The Firestore rules for them were tested in the emulator (phone, Apple, verified and
-  unverified email accounts, both invite kinds).
-- **No store build has been made yet** — the EAS project, profiles and workflows exist, but the one-time setup
-  above hasn't been run.
 - **Web** only runs practice mode now; the real backend needs the native SDK.
 - **Android runs** on a Pixel 9 emulator (`emulator -avd Pixel_9 &`, then `npx expo run:android`); each
   environment's `google-services.json` is in `firebase/<env>/`. Firebase has the SHA fingerprints of the local debug
-  key and the EAS beta and prod keystores (phone sign-in needs them). Still to do for Play: a developer account, the
+  key and the EAS beta and prod keystores. Still to do for Play: a developer account, the
   Play Console apps, a service account key in EAS for `eas submit -p android`, a manual first upload per app, then
   Play's app signing fingerprints added in Firebase. Only sign-in has been tried on Android so far.
 - **Tested** on iPhone 17 and iPad Pro 13" simulators in practice mode (full caregiver and family flows).

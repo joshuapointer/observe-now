@@ -66,8 +66,9 @@ function SubscriptionSection() {
   };
   const doRestore = async () => {
     if (!pid) return;
-    const ok = await restore(pid).catch(() => false);
-    toast(ok ? "Subscription restored." : `No subscription found for ${V.ctx.name}'s log.`);
+    const ent = await restore(pid).catch(() => null);
+    if (ent) useApp.setState({ entitlement: ent });
+    toast(ent?.active ? "Subscription restored." : `No subscription found for ${V.ctx.name}'s log.`);
   };
   return (
     <Section title="Subscription">

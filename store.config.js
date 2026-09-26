@@ -1,4 +1,13 @@
-{
+// The App Store listing (EAS Metadata: npm run metadata). The App Review contact number and demo login are private:
+// they're read from store/review.local.json, which isn't committed (this repository is public).
+const fs = require("node:fs");
+const path = require("node:path");
+
+const file = path.join(__dirname, "store/review.local.json");
+if (!fs.existsSync(file)) throw new Error("Missing store/review.local.json (reviewPhone, demoUsername, demoPassword). See README → App Store.");
+const review = JSON.parse(fs.readFileSync(file, "utf8"));
+
+module.exports = {
   "configVersion": 0,
   "apple": {
     "copyright": "2026 Joshua Pointer",
@@ -54,15 +63,15 @@
       "firstName": "Joshua",
       "lastName": "Pointer",
       "email": "privacy@joshpointer.com",
-      "phone": "+1 479 800 9990",
-      "demoUsername": "+1 650 555 3434",
-      "demoPassword": "246810",
+      "phone": review.reviewPhone,
+      "demoUsername": review.demoUsername,
+      "demoPassword": review.demoPassword,
       "demoRequired": true,
-      "notes": "Sign in with the mobile number +1 650 555 3434 and the code 246810 (a Firebase test number: no text is sent).\n\nA new account starts empty. To see the app:\n1. Tap \"Add this person\" and type any first name (for example Garth).\n2. Add a caregiver: any name and a 4-digit PIN (for example 1234). Tap your name and type the PIN to start a shift.\n3. On Now, tap the big card (or + then Record), choose what the person is doing, and Save.\n4. Settings (person icon, top right, then Settings) has Family (invite by email or mobile), Codes, Medicines and Delete my account.\n\nFamily members see the log on their own phone after being invited; the caregiver's \"What family see\" preview (Care tab) shows their view.\n\nSign in with Apple is also available. Account deletion: Settings, then Delete my account."
+      "notes": "Sign in with the email and password above (\"Sign in\" on the first screen).\n\nThe account starts empty. To see the app:\n1. Tap \"Add this person\" and type any first name (for example Garth).\n2. Add a caregiver: any name and a 4-digit PIN (for example 1234). Tap the name and type the PIN to start a shift.\n3. On Now, tap the big card (or + then Record), choose what the person is doing, and Save.\n4. The person button (top right) has Settings: Family (invite by email), Codes, Medicines, Subscription and Delete my account.\n\nFamily members see the log on their own phone after being invited; \"What family see\" on the Care tab shows their view.\n\nSign in with Apple is also available. Each care log has a 14-day free trial before its subscription."
     },
     "release": {
       "automaticRelease": false,
       "phasedRelease": false
     }
   }
-}
+};

@@ -211,7 +211,7 @@ function PeopleBody({ family, live, isOwner }: { family: Member[]; live: Member[
         <YStack gap={10}>
           <Rule />
           <T v="h2">Invite family</T>
-          <Field placeholder="Their email address or mobile number" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="off" autoCorrect={false} accessibilityLabel="Email address or mobile number" />
+          <Field placeholder="Their email address" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="off" autoCorrect={false} accessibilityLabel="Email address" />
           <Field placeholder="Their name" value={name} onChangeText={setName} autoComplete="off" accessibilityLabel="Name" />
           <Field placeholder="How they're related (daughter, son…)" value={relation} onChangeText={setRelation} autoComplete="off" accessibilityLabel="Relation" />
           <Field placeholder="Anything useful (for example lives overseas)" value={detail} onChangeText={setDetail} autoComplete="off" accessibilityLabel="Anything useful" />
@@ -221,7 +221,7 @@ function PeopleBody({ family, live, isOwner }: { family: Member[]; live: Member[
             title="Send invitation"
             onPress={() => { if (invite({ contact: email, name, relation, detail })) { setEmail(""); setName(""); setRelation(""); setDetail(""); } }}
           />
-          <T v="small" fontSize={13}>{"They sign in with this email or number and are let in automatically. Caregivers don't need an invitation: add them under Caregivers."}</T>
+          <T v="small" fontSize={13}>{"They sign up with this email address (or Sign in with Apple using it) and are let in automatically. Caregivers don't need an invitation: add them under Caregivers."}</T>
         </YStack>
       ) : null}
     </YStack>

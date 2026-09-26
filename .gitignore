@@ -49,4 +49,4 @@ yarn-error.*
 *-debug.log
 .tamagui/
 .firebase/
-functions/node_modules/
+store/review.local.json

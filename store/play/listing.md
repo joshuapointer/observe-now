@@ -47,8 +47,8 @@ Observe Now is a record-keeping and communication tool. It is not a medical devi
 
 - **Privacy policy:** https://observenow.joshpointer.com/privacy/
 - **App access:** "All or some functionality is restricted." Instructions:
-  Sign in with the mobile number +1 650 555 3434 and the code 246810 (a test number; no text is sent). A new
-  account starts empty: tap "Add this person", type any first name, add a caregiver (any name and PIN, e.g. 1234),
+  Sign in with the review account's email and password (enter them in the Play Console form; they're kept in
+  store/review.local.json, not in this public repo). A new account starts empty: tap "Add this person", type any first name, add a caregiver (any name and PIN, e.g. 1234),
   tap the name and type the PIN. Account deletion is in Settings → Delete my account.
 - **Ads:** No, the app doesn't contain ads.
 - **Content rating:** category "Reference, News, or Educational"; answer No to violence, sexuality, language,
@@ -60,8 +60,8 @@ Observe Now is a record-keeping and communication tool. It is not a medical devi
 - **Data safety:**
   - Collects data: Yes. Shares data with third parties: No (Firebase is a service provider, which isn't "sharing").
   - Encrypted in transit: Yes. Users can request deletion: Yes (in the app, and by email).
-  - Personal info: Name (app functionality, account management); Email address (account management); Phone number
-    (account management, app functionality). Collected, not shared, required for the account.
+  - Personal info: Name (app functionality, account management); Email address (account management). Collected,
+    not shared, required for the account.
   - Health and fitness: Health info (app functionality). Collected, not shared, optional per entry.
   - Messages: Other in-app messages (app functionality). Collected, not shared.
   - App activity: Other user-generated content (notes) (app functionality). Collected, not shared.
@@ -82,7 +82,7 @@ and share the opt-in link. Testers must opt in and keep the app installed.
 ## After the first upload
 
 - Play Console → Test and release → Setup → App integrity → App signing: copy the SHA-1 and SHA-256 of the
-  **app signing key** and add them to the Firebase Android app (phone sign-in needs them).
+  **app signing key** and add them to the Firebase Android app.
 - Service account for `eas submit -p android`: Google Cloud → IAM → Service accounts → create, add a JSON key;
   Play Console → Users and permissions → invite its email with release permissions; then
   `npx eas-cli@latest credentials -p android` → Google Service Account → upload the key.

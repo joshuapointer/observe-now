@@ -121,46 +121,18 @@ describe("deleting an account", () => {
     assertFails(deleteDoc(doc(as.phone(), "patients/p1/members/u-email"))));
 });
 
-describe("subscriptions", () => {
+describe("the trial clock", () => {
   const day = 86400000;
-  const enforce = () => env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), "config/billing"), { enforced: true }));
-  const setPatient = data => env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(), "patients/p1"), data));
-  const record = () => setDoc(doc(as.owner(), "patients/p1/shifts/2026-09-25/entries/0100"), { codes: ["AS"] });
-
-  it("a new log's trial start, if sent, must be the server's clock, and it can't come with billing", async () => {
+  it("a new log's trial start, if sent, must be the server's clock", async () => {
     await assertSucceeds(setDoc(doc(as.phone(), "patients/p8"), { name: "P", ownerUid: "u-phone" })); // older app versions
     await assertFails(setDoc(doc(as.phone(), "patients/p9"), { name: "P", ownerUid: "u-phone", trialStartedAt: Timestamp.fromMillis(Date.now() + 90 * day) }));
-    await assertFails(setDoc(doc(as.phone(), "patients/p9"), { name: "P", ownerUid: "u-phone", trialStartedAt: serverTimestamp(), billing: { until: Timestamp.fromMillis(Date.now() + 365 * day) } }));
   });
-  it("caregivers can't give themselves a subscription or a new trial", async () => {
-    await assertFails(updateDoc(doc(as.owner(), "patients/p1"), { billing: { until: Timestamp.fromMillis(Date.now() + 365 * day) } }));
+  it("caregivers can't restart a log's trial", async () => {
     await assertFails(updateDoc(doc(as.owner(), "patients/p1"), { trialStartedAt: serverTimestamp() }));
     await assertSucceeds(updateDoc(doc(as.owner(), "patients/p1"), { name: "Garth R." }));
   });
-  it("nothing is enforced until config/billing says so", () => assertSucceeds(record()));
-  it("when enforced: recording works in the trial, stops after it, and works again once paid", async () => {
-    await enforce();
-    await setPatient({ trialStartedAt: Timestamp.fromMillis(Date.now() - 3 * day) });
-    await assertSucceeds(record());
-    await setPatient({ trialStartedAt: Timestamp.fromMillis(Date.now() - 20 * day) });
-    await assertFails(record());
-    await setPatient({ billing: { until: Timestamp.fromMillis(Date.now() + 30 * day), status: "active" } });
-    await assertSucceeds(record());
-  });
-  it("a lapsed log can still report a fall and alert family, but nothing else", async () => {
-    await enforce();
-    await setPatient({ trialStartedAt: Timestamp.fromMillis(Date.now() - 20 * day) });
-    const db = as.owner();
-    await assertSucceeds(setDoc(doc(db, "patients/p1/shifts/2026-09-25/entries/0200"), { codes: ["FL"] }));
-    await assertSucceeds(setDoc(doc(db, "patients/p1/shifts/2026-09-25/alerts/a1"), { kind: "fall", code: "FL" }));
-    await assertFails(setDoc(doc(db, "patients/p1/shifts/2026-09-25/alerts/a2"), { kind: "pain", code: "PN" }));
-    await assertFails(setDoc(doc(db, "patients/p1/shifts/2026-09-25/entries/0300"), { codes: ["AS"] }));
-  });
-  it("a lapsed log is still readable, and its owner can still delete it", async () => {
-    await enforce();
-    await setPatient({ trialStartedAt: Timestamp.fromMillis(Date.now() - 20 * day) });
-    await env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), "patients/p1/shifts/2026-09-25/entries/0100"), { codes: ["AS"] }));
-    await assertSucceeds(getDoc(doc(as.owner(), "patients/p1/shifts/2026-09-25/entries/0100")));
-    await assertSucceeds(deleteDoc(doc(as.owner(), "patients/p1/shifts/2026-09-25/entries/0100")));
+  it("everyone signed in can read whether subscriptions are on; nobody can change it", async () => {
+    await assertSucceeds(getDoc(doc(as.email(), "config/billing")));
+    await assertFails(setDoc(doc(as.owner(), "config/billing"), { enforced: false }));
   });
 });

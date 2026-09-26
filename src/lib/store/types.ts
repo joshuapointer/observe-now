@@ -1,5 +1,5 @@
-// email is "" for a phone-only account and phone is "" otherwise. verified: a confirmed email address or a
-// phone number (which is confirmed by the text code it signed in with).
+// email is "" for an Apple account that shared none (and for accounts from when phone sign-in existed). verified: a
+// confirmed email address, or an Apple account.
 export type User = { uid: string; email: string; phone: string; verified: boolean };
 export type SyncStatus = { online: boolean; pending: number; lastSync: number };
 
@@ -18,8 +18,6 @@ export interface DataStore {
   onAuth(cb: (u: User | null) => void): Unsub;
   signIn(email: string, pw?: string): Promise<unknown>;
   signUp(email: string, pw: string): Promise<void>;
-  sendPhoneCode(phone: string): Promise<void>;
-  confirmPhoneCode(code: string): Promise<void>;
   signInWithApple(): Promise<void>;
   signOut(): Promise<void>;
   sendVerification(): Promise<void>;
@@ -35,9 +33,6 @@ export interface DataStore {
   remove(path: string): Promise<void>;
   newId(path: string): string;
   serverTime(): unknown; // a value the server replaces with its own clock when the write lands
-  // For calling our Cloud Functions: the Firebase project and a fresh ID token for the signed-in account.
-  projectId: string | null;
-  idToken(): Promise<string | null>;
   batch(ops: Op[]): Promise<void>;
   removeMany(paths: string[]): Promise<void>; // deletes in batches; used to delete a whole log
   deleteUser(): Promise<void>; // the signed-in account itself; rejects with auth/requires-recent-login if it's been a while

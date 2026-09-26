@@ -80,8 +80,6 @@ export function createLocalStore(): DataStore {
       authListeners.forEach(f => f(user));
     },
     signUp: async () => {},
-    sendPhoneCode: async () => {},
-    confirmPhoneCode: async () => {},
     signInWithApple: async () => {},
     async signOut() {
       user = null;
@@ -110,8 +108,6 @@ export function createLocalStore(): DataStore {
     async setDoc(path, value, doMerge = true) { write(path, value, doMerge); persist(); notify(); },
     async remove(path) { delete data[path]; persist(); notify(); },
     serverTime: () => Date.now(),
-    projectId: null,
-    idToken: async () => null,
     newId: () => "d" + Date.now().toString(36) + (idCounter++).toString(36),
     async batch(ops) {
       for (const { path, data: v, merge: m = true } of ops) write(path, v, m);

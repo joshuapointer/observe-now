@@ -1,12 +1,12 @@
-// Port of the PWA's authView (views.js ~485-502): sign in / sign up, or (practice mode) a caregiver/family
-// role choice. The app adds Sign in with Apple (iOS) and signing in with a mobile number and a texted code.
+// Sign in or sign up with email and password, or Sign in with Apple (iOS); in practice mode, a caregiver/family
+// role choice instead.
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { YStack } from "tamagui";
 
 import { APP_NAME, DEMO } from "@/lib/config";
 import {
-  confirmPhoneCode, demoSignIn, resetPassword, sendPhoneCode, setAuthMethod, signInWithApple, submitAuth, toggleAuthMode,
+  demoSignIn, resetPassword, signInWithApple, submitAuth, toggleAuthMode,
 } from "@/state/actions";
 import { useApp } from "@/state/app";
 import { Button, Field, Row, Rule, Seg, T } from "@/ui/primitives";
@@ -17,7 +17,6 @@ export function AuthView() {
   const authMode = useApp(s => s.authMode);
   const authError = useApp(s => s.authError);
   const authBusy = useApp(s => s.authBusy);
-  const authMethod = useApp(s => s.authMethod);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -37,8 +36,6 @@ export function AuthView() {
 
   const up = authMode === "signup";
   const submit = () => submitAuth(email, password);
-
-  if (authMethod === "phone") return <PhoneSignIn />;
 
   return (
     <GateLayout>
@@ -85,7 +82,6 @@ export function AuthView() {
       <LinkButton title={up ? "I already have an account" : "New here? Create an account"} onPress={toggleAuthMode} />
       {up ? null : <LinkButton title="I forgot my password" onPress={() => resetPassword(email)} />}
       <AppleSignIn />
-      <LinkButton title="Use my mobile number instead" onPress={() => setAuthMethod("phone")} />
     </GateLayout>
   );
 }
@@ -109,67 +105,5 @@ function AppleSignIn() {
         onPress={() => { if (!authBusy) signInWithApple(); }}
       />
     </YStack>
-  );
-}
-
-// The default: mobile number → texted 6-digit code. The same two steps sign up a new person and sign in a
-// returning one.
-function PhoneSignIn() {
-  const authError = useApp(s => s.authError);
-  const authBusy = useApp(s => s.authBusy);
-  const sentTo = useApp(s => s.phoneSentTo);
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
-
-  return (
-    <GateLayout>
-      <T v="title">{APP_NAME}</T>
-      {sentTo ? (
-        <>
-          <T color="$color11">
-            We&apos;ve texted a 6-digit code to <T weight="heavy" color="$color12">{sentTo}</T>. Type it below.
-          </T>
-          <YStack gap={14}>
-            <Field
-              label="Code from the text"
-              value={code}
-              onChangeText={v => setCode(v.replace(/\D/g, "").slice(0, 6))}
-              keyboardType="number-pad"
-              autoComplete="sms-otp"
-              textContentType="oneTimeCode"
-              returnKeyType="go"
-              onSubmitEditing={() => confirmPhoneCode(code)}
-            />
-            <ErrorText>{authError}</ErrorText>
-            <Button kind="primary" big disabled={authBusy} title={authBusy ? "One moment…" : "Sign in"} onPress={() => confirmPhoneCode(code)} />
-          </YStack>
-          <LinkButton title="Send a new code" onPress={() => { setCode(""); sendPhoneCode(sentTo); }} />
-          <LinkButton title="Use a different number" onPress={() => { setCode(""); setAuthMethod("phone"); }} />
-        </>
-      ) : (
-        <>
-          <T color="$color11">
-            Sign in with your mobile number. We&apos;ll text you a code. Family: use the number you were invited with.
-          </T>
-          <YStack gap={14}>
-            <Field
-              label="Mobile number"
-              hint="Include the country code if you're outside the US or Canada, like +44 7700 900123."
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              textContentType="telephoneNumber"
-              returnKeyType="go"
-              onSubmitEditing={() => sendPhoneCode(phone)}
-            />
-            <ErrorText>{authError}</ErrorText>
-            <Button kind="primary" big disabled={authBusy} title={authBusy ? "One moment…" : "Text me a code"} onPress={() => sendPhoneCode(phone)} />
-          </YStack>
-          <AppleSignIn />
-        </>
-      )}
-      <LinkButton title="Use email instead" onPress={() => setAuthMethod("email")} />
-    </GateLayout>
   );
 }

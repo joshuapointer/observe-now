@@ -3,6 +3,7 @@ import { AppState as RNAppState } from "react-native";
 import { PATIENT_ID } from "@/lib/config";
 import { buildRegistry } from "@/lib/codes";
 import { kv } from "@/lib/kv";
+import { checkEntitlement, PURCHASES_AVAILABLE } from "@/lib/purchases";
 import * as M from "@/lib/model";
 import { getStore, type DataStore, type Unsub } from "@/lib/store";
 import type { AlertDoc, Caregiver, Day, DayData, Entry, Invite, Link, Member, Message, Patient, Presence, PrivateNote } from "@/lib/types";
@@ -133,15 +134,20 @@ async function onLinks() {
 
 export async function loadPendingInvites() {
   set({ pendingInvites: [] });
-  const { email, phone } = get().user || {};
-  // Each lookup fails on its own (rules deny a list for a claim the account doesn't have), so one can't sink the other.
-  const load = (path: string) => store().getCol<Invite>(path).catch(() => [] as Invite[]);
-  const [byEmail, byPhone] = await Promise.all([
-    email ? load(`invitesByEmail/${email}/for`) : [],
-    phone ? load(`invitesByPhone/${phone}/for`) : [],
-  ]);
-  const seen = new Set<string>();
-  set({ pendingInvites: [...byEmail, ...byPhone].filter(i => !seen.has(i.id) && !!seen.add(i.id)) });
+  const email = get().user?.email;
+  const list = email ? await store().getCol<Invite>(`invitesByEmail/${email}/for`).catch(() => [] as Invite[]) : [];
+  set({ pendingInvites: list });
+}
+
+// Ask RevenueCat whether the open log is subscribed (caregivers only; family never pay). Quietly does nothing in
+// builds without purchases, or offline before RevenueCat has answered once.
+export async function refreshEntitlement() {
+  const S = get(), pid = S.pid;
+  if (!pid || !PURCHASES_AVAILABLE || S.member?.role !== "caregiver") return;
+  try {
+    const ent = await checkEntitlement(pid);
+    if (get().pid === pid) set({ entitlement: ent });
+  } catch (e) { if (__DEV__) console.warn("[billing]", e); }
 }
 
 export function selectPatient(pid: string | null) {
@@ -151,7 +157,7 @@ export function selectPatient(pid: string | null) {
     reg: buildRegistry(), // until this patient's own list arrives
     target: null, pendingCodes: [], trends: null, follow: true, sid: M.sidAt(Date.now()),
     place: "", pain: "—", details: false, // half-filled entries belong to the patient they were started for
-    pickerOpen: false, addingPatient: false, modal: null, medForm: null,
+    pickerOpen: false, addingPatient: false, modal: null, medForm: null, entitlement: null,
     drafts: pid && get().user ? kv.get(`gl:drafts:${get().user!.uid}:${pid}`, {}) : {},
     viewAs: pid && get().user ? kv.get(`gl:view:${get().user!.uid}:${pid}`, null) : null,
   });
@@ -184,6 +190,7 @@ function onMember() {
   sync();
   lastBeat = 0;
   beat();
+  refreshEntitlement();
 }
 
 function afterDay() {
@@ -256,6 +263,7 @@ export function boot() {
       useNow.setState({ now: Date.now() });
       const S = get();
       if (S.follow && M.sidAt(Date.now()) !== S.sid) viewDay(M.sidAt(Date.now()), true);
+      refreshEntitlement(); // a renewal, cancellation or purchase on another device
       lastBeat = 0;
       beat();
     }

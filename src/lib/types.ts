@@ -17,20 +17,12 @@ export type Patient = {
   onShift?: OnShift | null;
   codes?: Code[];
   createdAt?: number;
-  // Set by the server: when the trial began (server clock), and the subscription (written by the Cloud Functions).
-  trialStartedAt?: TimeValue;
-  billing?: Billing;
+  trialStartedAt?: TimeValue; // when the trial began, stamped with the server's clock
 };
 
 // A Firestore timestamp arrives as an object with toMillis(); the practice store keeps plain milliseconds.
 export type TimeValue = number | { toMillis(): number } | null;
-export type Billing = {
-  status?: "active" | "grace" | "expired" | "cancelled";
-  until?: TimeValue; // paid up to (including any billing grace period)
-  willRenew?: boolean;
-  store?: "app_store" | "play_store" | "stripe" | "promotional" | string;
-  productId?: string;
-};
+
 
 export type Member = {
   id: string;

@@ -12,13 +12,7 @@
       "bundleIdentifier": "com.joshpointer.observenow",
       "icon": "./assets/ObserveNow.icon",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
-      },
-      "entitlements": {
-        "aps-environment": "development"
+        "ITSAppUsesNonExemptEncryption": false
       },
       "usesAppleSignIn": true
     },

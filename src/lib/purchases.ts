@@ -1,16 +1,24 @@
-// Buying and restoring a care log's subscription through RevenueCat (App Store, Google Play). Each log is its own
-// RevenueCat customer ("log_<patient id>"), so the subscription belongs to the log, not to the phone that paid, and
-// every caregiver device for that log sees it. After a purchase or restore the server is asked to check RevenueCat
-// and update the log (the webhook would get there too, a little later).
+// Buying, restoring and checking a care log's subscription through RevenueCat (App Store, Google Play). Each log is
+// its own RevenueCat customer ("log_<patient id>"), so the subscription belongs to the log, not to the phone that
+// paid, and every caregiver device for that log sees it. The app asks RevenueCat directly (there's no server step).
 import { Platform } from "react-native";
-import type { PurchasesPackage } from "react-native-purchases";
+import type { CustomerInfo, PurchasesPackage } from "react-native-purchases";
 
 import { DEMO, SCREENSHOTS } from "./config";
-import { getStore as store } from "./store";
 
 const KEY = Platform.OS === "ios" ? process.env.EXPO_PUBLIC_RC_APPLE_KEY : process.env.EXPO_PUBLIC_RC_GOOGLE_KEY;
 // The screenshot build shows the paywall with sample prices (for the App Store review screenshot); nothing is sold.
 export const PURCHASES_AVAILABLE = SCREENSHOTS || (!DEMO && !!KEY);
+
+const ENTITLEMENT = "care_log";
+export type Entitlement = { active: boolean; until: number; willRenew: boolean };
+
+const toEntitlement = (info: CustomerInfo): Entitlement => {
+  const e = info.entitlements.active[ENTITLEMENT];
+  return e
+    ? { active: true, until: e.expirationDate ? Date.parse(e.expirationDate) : Date.UTC(9999, 0, 1), willRenew: e.willRenew }
+    : { active: false, until: 0, willRenew: false };
+};
 
 export type Plan = { id: string; title: string; price: string; perMonth: string | null; period: "month" | "year" | "other"; pkg: PurchasesPackage };
 
@@ -48,35 +56,27 @@ export async function loadPlans(pid: string): Promise<Plan[]> {
   }).sort((a, b) => (a.period === "year" ? -1 : b.period === "year" ? 1 : 0));
 }
 
-// Ask the server to check RevenueCat for this log and update it. Returns whether it's now paid up.
-export async function syncBilling(pid: string): Promise<boolean> {
-  const st = store(), token = await st.idToken();
-  if (!st.projectId || !token) return false;
-  const res = await fetch(`https://us-central1-${st.projectId}.cloudfunctions.net/syncBilling`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ pid }),
-  });
-  const out = await res.json().catch(() => ({}));
-  return res.ok && (out.status === "active" || out.status === "grace");
+// Whether this log is subscribed right now (RevenueCat caches it, so this is quick and works briefly offline).
+export async function checkEntitlement(pid: string): Promise<Entitlement> {
+  if (SCREENSHOTS) return { active: false, until: 0, willRenew: false };
+  const Purchases = await asLog(pid);
+  return toEntitlement(await Purchases.getCustomerInfo());
 }
 
-// Resolves true once paid; false if the person cancelled the store sheet. Throws on real errors.
-export async function buy(pid: string, plan: Plan): Promise<boolean> {
+// The log's entitlement after buying; null if the person cancelled the store sheet. Throws on real errors.
+export async function buy(pid: string, plan: Plan): Promise<Entitlement | null> {
   const Purchases = await asLog(pid);
   try {
-    await Purchases.purchasePackage(plan.pkg);
+    return toEntitlement((await Purchases.purchasePackage(plan.pkg)).customerInfo);
   } catch (e) {
-    if ((e as { userCancelled?: boolean })?.userCancelled) return false;
+    if ((e as { userCancelled?: boolean })?.userCancelled) return null;
     throw e;
   }
-  return syncBilling(pid);
 }
 
-export async function restore(pid: string): Promise<boolean> {
+export async function restore(pid: string): Promise<Entitlement> {
   const Purchases = await asLog(pid);
-  await Purchases.restorePurchases();
-  return syncBilling(pid);
+  return toEntitlement(await Purchases.restorePurchases());
 }
 
 // Where the person manages (or cancels) the subscription: the App Store or Play subscriptions page.

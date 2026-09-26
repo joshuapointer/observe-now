@@ -1,5 +1,4 @@
 // Every user action from the PWA's `acts` and `forms`, as plain functions the screens call.
-import { getLocales } from "expo-localization";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 
@@ -7,7 +6,6 @@ import { canRecord } from "@/lib/billing";
 import { SECTIONS, SYSTEM_CODES, alertKind, FALL_QUESTIONS, type Code } from "@/lib/codes";
 import { kv } from "@/lib/kv";
 import * as M from "@/lib/model";
-import { looksLikeEmail, toE164 } from "@/lib/phone";
 import { pinHash } from "@/lib/pin";
 import type { Caregiver, Entry, Invite } from "@/lib/types";
 import { actingAs, get, set, useNow, type Acting, type AppState, type Drafts, type ModalId, type Settings } from "./app";
@@ -476,21 +474,11 @@ export function saveDetails(v: { name: string; careSetting: string; onCallPhone:
   toast("Details saved");
 }
 
-const region = () => getLocales()[0]?.regionCode ?? null;
-
-// Filed by whichever the invitee will sign in with: invitesByEmail/{email} or invitesByPhone/{+E.164}.
+// Filed by the invitee's email address (invitesByEmail/{email}), which they sign up or sign in with.
 export function invite(v: { contact: string; name: string; relation: string; detail: string }) {
-  const S = get(), raw = v.contact.trim();
-  let path: string, shown: string;
-  if (looksLikeEmail(raw)) {
-    const email = raw.toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast("That doesn't look like an email address. Check it for typos."); return false; }
-    path = `invitesByEmail/${email}`; shown = `${email}. They sign up with that email address.`;
-  } else {
-    const phone = toE164(raw, region());
-    if (!phone) { toast("Type their email address, or their mobile number with its country code (like +44 7700 900123)."); return false; }
-    path = `invitesByPhone/${phone}`; shown = `${phone}. They sign in with that mobile number.`;
-  }
+  const S = get(), email = v.contact.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast("That doesn't look like an email address. Check it for typos."); return false; }
+  const path = `invitesByEmail/${email}`, shown = `${email}. They sign up with that email address, or with Sign in with Apple using it.`;
   if (!v.name.trim()) { toast("Type their name first."); return false; }
   const invitePath = `${path}/for/${S.pid}`;
   run(store().batch([
@@ -587,35 +575,11 @@ const authMessages: Record<string, string> = {
   "auth/missing-password": "Type your password first.",
   "auth/network-request-failed": "There's no internet connection right now. Try again when you're back online.",
   "auth/too-many-requests": "Too many tries. Please wait a minute, then try again.",
-  "auth/invalid-phone-number": "That doesn't look like a mobile number. Include the country code, like +44 7700 900123.",
-  "auth/missing-phone-number": "Type your mobile number first.",
-  "auth/quota-exceeded": "We can't send more text codes right now. Please try again later, or sign in with email.",
-  "auth/invalid-verification-code": "That code isn't right. Check the text and try again.",
-  "auth/missing-verification-code": "Type the 6-digit code from the text first.",
-  "auth/session-expired": "That code has expired. Send a new one.",
-  "auth/code-expired": "That code has expired. Send a new one.",
-  "auth/missing-verification-id": "Send yourself a code first.",
   "auth/account-exists-with-different-credential": "There's already an account with that email address. Sign in with your email and password instead.",
   "auth/operation-not-allowed": "That way of signing in isn't switched on yet. Use email and password for now.",
 };
 
 export const toggleAuthMode = () => set({ authMode: get().authMode === "signup" ? "signin" : "signup", authError: "" });
-export const setAuthMethod = (authMethod: "email" | "phone") => set({ authMethod, phoneSentTo: "", authError: "" });
-
-// Phone sign-in: one step for new and returning people alike. Firebase creates the account on first sign-in.
-export async function sendPhoneCode(input: string) {
-  const phone = toE164(input, region());
-  if (!phone) return set({ authError: authMessage({ code: input.trim() ? "auth/invalid-phone-number" : "auth/missing-phone-number" }) });
-  set({ authBusy: true, authError: "" });
-  try { await store().sendPhoneCode(phone); set({ phoneSentTo: phone }); } catch (e) { set({ authError: authMessage(e as { code?: string }) }); }
-  set({ authBusy: false });
-}
-export async function confirmPhoneCode(code: string) {
-  if (!/^\d{6}$/.test(code.trim())) return set({ authError: authMessage({ code: "auth/missing-verification-code" }) });
-  set({ authBusy: true, authError: "" });
-  try { await store().confirmPhoneCode(code.trim()); set({ phoneSentTo: "" }); } catch (e) { set({ authError: authMessage(e as { code?: string }) }); }
-  set({ authBusy: false });
-}
 export async function signInWithApple() {
   set({ authBusy: true, authError: "" });
   try { await store().signInWithApple(); } catch (e) {
@@ -649,7 +613,7 @@ export async function refreshVerification() {
 export const demoSignIn = (role: "caregiver" | "family") => store().signIn(role);
 
 export async function signOut() {
-  if (isCaregiver() && !(await ask({ title: "Sign this device out?", body: "Someone will need the account's sign-in details (email and password, Apple ID, or its phone for a texted code) to sign it back in. To hand over to the next caregiver, use End shift instead.", yes: "Yes, sign out", destructive: true }))) return;
+  if (isCaregiver() && !(await ask({ title: "Sign this device out?", body: "Someone will need the account's sign-in details (its email and password, or its Apple ID) to sign it back in. To hand over to the next caregiver, use End shift instead.", yes: "Yes, sign out", destructive: true }))) return;
   clearTimeout(fallTimer);
   const S = get();
   if (S.pid && S.user) kv.del(draftsKey(S.user.uid, S.pid)); // nothing half-typed stays on a shared device
