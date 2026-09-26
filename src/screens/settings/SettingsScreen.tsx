@@ -9,13 +9,15 @@ import { XStack, YStack } from "tamagui";
 
 import { DEMO } from "@/lib/config";
 import { activeCodes } from "@/lib/codes";
+import { PUSH_AVAILABLE } from "@/lib/push";
 import { manageUrl, PURCHASES_AVAILABLE, restore } from "@/lib/purchases";
 import * as M from "@/lib/model";
 import { deleteAccount, editMeds, openModal, setSetting, signOut } from "@/state/actions";
 import { actingAs, useApp, type Settings } from "@/state/app";
 import { toast } from "@/state/feedback";
+import { registerDevice, setEvery, usePush } from "@/state/notify";
 import { useView } from "@/state/view";
-import { ChevronRight, CircleHelp, ListChecks, LogOut, Pill, Sparkles, Stethoscope, Users } from "@/ui/icons";
+import { Bell, ChevronRight, CircleHelp, ListChecks, LogOut, Pill, Sparkles, Stethoscope, Users } from "@/ui/icons";
 import { useLayout } from "@/ui/layout";
 import { Button, Card, ListRow, Scroll, Screen, Section, Seg, T } from "@/ui/primitives";
 
@@ -47,6 +49,32 @@ function Toggle({ k, title, detail, last }: { k: "plain" | "nudge" | "wake"; tit
       last={last}
       right={<Seg small title={on ? "On" : "Off"} on={on} onPress={() => setSetting(k, !on)} accessibilityLabel={`${title}: ${on ? "on" : "off"}`} />}
     />
+  );
+}
+
+// Notifications on this device: whether they're allowed, and (family) whether every entry comes through too.
+function NotificationsSection({ isFamily, name }: { isFamily: boolean; name: string }) {
+  const perm = usePush(s => s.perm);
+  const every = usePush(s => s.every);
+  const what = isFamily ? `Messages, red alerts and notes about ${name}` : "Messages from family";
+  const status =
+    perm === "granted" ? <Seg small title="On" on accessibilityLabel="Notifications are on" />
+    : perm === "denied" ? <Seg small title="Turn on" onPress={() => Linking.openSettings()} accessibilityLabel="Turn on notifications in Settings" />
+    : <Seg small title="Turn on" onPress={registerDevice} />;
+  return (
+    <Section title="Notifications">
+      <Card pad={0}>
+        <ListRow icon={Bell} title="On this device" detail={perm === "denied" ? "Off. Turn them on in your phone's Settings." : what} right={status} last={!isFamily} />
+        {isFamily ? (
+          <ListRow
+            title="Every update"
+            detail={every ? `Each time something is recorded for ${name}` : "Only messages, red alerts and notes"}
+            right={<Seg small title={every ? "On" : "Off"} on={every} disabled={perm !== "granted"} onPress={() => setEvery(!every)} accessibilityLabel={`Every update: ${every ? "on" : "off"}`} />}
+            last
+          />
+        ) : null}
+      </Card>
+    </Section>
   );
 }
 
@@ -119,6 +147,8 @@ export function SettingsScreen() {
               </Card>
             </Section>
           )}
+
+          {PUSH_AVAILABLE ? <NotificationsSection isFamily={isFamily} name={V.ctx.name} /> : null}
 
           {isFamily || V.billing.kind === "off" ? null : <SubscriptionSection />}
 

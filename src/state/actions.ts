@@ -11,6 +11,7 @@ import type { Caregiver, Entry, Invite } from "@/lib/types";
 import { actingAs, get, set, useNow, type Acting, type AppState, type Drafts, type ModalId, type Settings } from "./app";
 import { ask, clearToast, run, toast } from "./feedback";
 import { PP, dayPath, dropAll, loadPendingInvites, selectPatient, store, sync, uid, viewDay, welcomeKey } from "./session";
+import { notify, registerDevice, unregisterDevice } from "./notify";
 import { compute, type Thread } from "./view";
 
 const V = () => compute(get(), Date.now());
@@ -133,6 +134,7 @@ async function markFall() {
     { path: `${dayPath(S.sid)}/alerts/${alertId}`, data: { kind: "fall", code: "FL", text: M.alertText("fall", v.ctx), at: now, entryKey: v.key, acks: {} }, merge: false },
     { path: dayPath(S.sid), data: { fall: { at: now, slotKey: v.key, alertId, answers, narrative: "", filedAt: null } } },
   ]));
+  notify("family", { kind: "alert", channel: "alerts", title: `Red alert · ${v.ctx.name}`, body: M.alertText("fall", v.ctx) });
 }
 
 export async function commit() {
@@ -159,6 +161,10 @@ export async function commit() {
   done();
   const path = entryPath(S.sid, v.key), prev = existing && strip(existing);
   run(store().batch(ops));
+  const at = M.hhmm(data.slotStart);
+  if (kind) notify("family", { kind: "alert", channel: "alerts", title: `Red alert · ${v.ctx.name}`, body: M.alertText(kind, v.ctx, { pain: S.pain }) });
+  else if (typed) notify("family", { kind: "note", channel: "updates", title: `${v.ctx.name} · ${at}`, body: M.entryLine(data, v.ctx) });
+  else notify("updates", { kind: "update", channel: "updates", title: `${v.ctx.name} · ${at}`, body: M.entryLine(data, v.ctx) });
   // Marks that raised an alert can't be quietly taken back; everything else can — undo restores exactly what was there.
   toast(kind ? "Saved — red alert sent to family" : `Saved ${M.hhmm(data.slotStart)}`,
     kind ? null : () => (prev ? store().setDoc(path, prev, false) : store().remove(path)));
@@ -249,12 +255,11 @@ export async function saveNote(privateOnly: boolean) {
   if (privateOnly) {
     run(store().setDoc(`${dayPath(S.sid)}/privateNotes/${key}`, { note: join(v.D.priv.find(p => p.id === key)?.note), at: Date.now(), ...byFields() }));
     toast("Note saved — family can't see it");
-  } else if (existing) {
-    run(store().setDoc(entryPath(S.sid, key), { note: join(existing.note) }));
-    toast("Note saved — family can see it");
   } else {
-    run(store().setDoc(entryPath(S.sid, key), { slot: v.d.cur, slotStart: v.info.start + v.d.cur * M.SLOT_MS, codes: [], place: "", pain: "—", note: text, markedAt: Date.now(), ...byFields() }));
+    if (existing) run(store().setDoc(entryPath(S.sid, key), { note: join(existing.note) }));
+    else run(store().setDoc(entryPath(S.sid, key), { slot: v.d.cur, slotStart: v.info.start + v.d.cur * M.SLOT_MS, codes: [], place: "", pain: "—", note: text, markedAt: Date.now(), ...byFields() }));
     toast("Note saved — family can see it");
+    notify("family", { kind: "note", channel: "updates", title: `Note about ${v.ctx.name}`, body: `${v.ctx.caregiver}: ${text}` });
   }
 }
 
@@ -313,6 +318,7 @@ export async function fileFall() {
     { path: `${dayPath(sid)}/alerts/${store().newId(`${dayPath(sid)}/alerts`)}`, data: { kind: "fall-note", code: "FL", text: M.fallSummary(f, v.ctx), at: now, acks: {} }, merge: false },
     { path: dayPath(sid), data: { fall: { filedAt: now, narrative: get().drafts.fallNarr ?? f.narrative ?? "" } } },
   ]));
+  notify("family", { kind: "alert", channel: "alerts", title: `Fall report · ${v.ctx.name}`, body: M.fallSummary({ ...f, narrative: get().drafts.fallNarr ?? f.narrative ?? "" }, v.ctx) });
   toast("Fall report sent to family");
 }
 
@@ -496,9 +502,12 @@ export const reveal = (id: string) => set({ revealed: { ...get().revealed, [id]:
 
 // ---- messages ----
 // Messages are stored in each day's "familyNotes" (the name predates replies). Returns the new id.
-function sendMessage(sid: string, data: Record<string, unknown>) {
+function sendMessage(sid: string, data: Record<string, unknown> & { who: string; role: string; text: string; parentId?: string }) {
   const col = `${dayPath(sid)}/familyNotes`, id = store().newId(col);
   run(store().setDoc(`${col}/${id}`, { ...data, uid: uid(), at: Date.now() }, false));
+  // Family write to the caregivers; a caregiver writes to family.
+  const name = get().patient?.name || "";
+  notify(data.role === "caregiver" ? "family" : "care", { kind: "message", channel: "messages", title: name ? `${data.who} · ${name}` : data.who, body: data.text, thread: data.parentId || id });
   return id;
 }
 
@@ -522,7 +531,7 @@ export function openThread(id: string | "new" | null) {
 }
 
 // Who a message is from: the caregiver on shift in caregiver mode, this family member in family mode.
-function messageFrom(): Record<string, unknown> | null {
+function messageFrom(): { who: string; role: string; relation?: string; cid?: string } | null {
   const S = get();
   if (actingAs(S) === "family") return S.member ? { who: M.firstName(S.member.name), relation: S.member.relation || "", role: "family" } : null;
   const s = onShift();
@@ -617,6 +626,7 @@ export async function signOut() {
   clearTimeout(fallTimer);
   const S = get();
   if (S.pid && S.user) kv.del(draftsKey(S.user.uid, S.pid)); // nothing half-typed stays on a shared device
+  await unregisterDevice((S.links || []).map(l => l.id));
   dropAll();
   set({ drafts: {}, toast: "", undo: null, modal: null });
   await store().signOut();
@@ -639,7 +649,7 @@ async function ownedLogPaths(pid: string, createdAt: number) {
     paths.push(...chunk.flat());
   }
   paths.push(...days.map(d => `${base}/shifts/${d.id}`));
-  for (const c of ["caregivers", "shiftLog", "presence"]) paths.push(...(await st.getCol<{ id: string }>(`${base}/${c}`)).map(d => `${base}/${c}/${d.id}`));
+  for (const c of ["caregivers", "shiftLog", "presence", "devices"]) paths.push(...(await st.getCol<{ id: string }>(`${base}/${c}`)).map(d => `${base}/${c}/${d.id}`));
   const invites = await st.getCol<{ id: string; path?: string }>(`${base}/invitations`);
   paths.push(...invites.flatMap(i => [i.path, `${base}/invitations/${i.id}`].filter(Boolean) as string[]));
   // Members last but the owner's own, which the rules need until the very end; then the owner, then the patient.
@@ -666,6 +676,7 @@ export async function deleteAccount() {
     for (const o of owned) await store().removeMany(await ownedLogPaths(o.id, o.createdAt));
     // Logs you follow (or care for, without owning): take yourself off them.
     const followed = links.filter(l => !owned.some(o => o.id === l.id));
+    await unregisterDevice(followed.map(l => l.id));
     await store().removeMany(followed.flatMap(l => [`patients/${l.id}/presence/${me}`, `patients/${l.id}/members/${me}`]));
     await store().removeMany(links.map(l => `users/${me}/patients/${l.id}`));
     dropAll();
@@ -726,6 +737,7 @@ export async function setViewAs(viewAs: Acting) {
   kv.set(`gl:view:${uid()}:${S.pid}`, viewAs);
   set({ viewAs, modal: null });
   sync();
+  registerDevice();
 }
 
 // The owner lets a family member also act as a caregiver for this person, or takes that back. They stay family.

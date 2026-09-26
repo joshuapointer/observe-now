@@ -1,4 +1,5 @@
 // Icons used by the app, imported one file each so the bundle carries only these (lucide, via Tamagui).
+export { Bell } from "@tamagui/lucide-icons-2/icons/Bell";
 export { Activity } from "@tamagui/lucide-icons-2/icons/Activity";
 export { CalendarDays } from "@tamagui/lucide-icons-2/icons/CalendarDays";
 export { Check } from "@tamagui/lucide-icons-2/icons/Check";

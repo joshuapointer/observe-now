@@ -9,6 +9,7 @@ import { getStore, type DataStore, type Unsub } from "@/lib/store";
 import type { AlertDoc, Caregiver, Day, DayData, Entry, Invite, Link, Member, Message, Patient, Presence, PrivateNote } from "@/lib/types";
 import { actingAs, get, initialSession, set, useNow } from "./app";
 import { toast, run } from "./feedback";
+import { registerDevice, setUpNotifications } from "./notify";
 
 export const store = (): DataStore => getStore();
 
@@ -191,6 +192,7 @@ function onMember() {
   lastBeat = 0;
   beat();
   refreshEntitlement();
+  registerDevice();
 }
 
 function afterDay() {
@@ -224,6 +226,7 @@ export function boot() {
   if (booted) return;
   booted = true;
   const st = store();
+  setUpNotifications(selectPatient, id => set({ thread: id }));
   st.onAuth(u => {
     if (u) {
       set({ authReady: true, user: u, msgReadAt: kv.get(`gl:msgRead:${u.uid}`, {}), threadRead: kv.get(`gl:threadRead:${u.uid}`, {}) });

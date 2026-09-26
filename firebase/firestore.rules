@@ -96,6 +96,16 @@ service cloud.firestore {
         allow delete: if isOwner(p);
       }
 
+      // Devices that get notifications about this person, one per install: its login, push token, which side of
+      // the app it's on, and whether it wants every update. Everyone on the log can read them, because the phone
+      // that saves something sends the notifications itself. Each login writes only its own devices.
+      match /devices/{d} {
+        allow read: if isMember(p);
+        allow create: if isMember(p) && request.resource.data.uid == request.auth.uid;
+        allow update: if isMember(p) && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid;
+        allow delete: if isOwner(p) || (signedIn() && resource.data.uid == request.auth.uid);
+      }
+
       match /presence/{u} {
         allow read: if isMember(p);
         allow write: if isMember(p) && u == request.auth.uid;

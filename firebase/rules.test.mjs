@@ -136,3 +136,33 @@ describe("the trial clock", () => {
     await assertFails(setDoc(doc(as.owner(), "config/billing"), { enforced: false }));
   });
 });
+
+describe("notification devices", () => {
+  const family = () => env.authenticatedContext("u-fam", { email: "fam@example.com", email_verified: true }).firestore();
+  const outsider = () => env.authenticatedContext("u-out", { email: "out@example.com", email_verified: true }).firestore();
+  const device = uid => ({ uid, token: "ExponentPushToken[x]", platform: "ios", mode: "family", every: false, at: 1 });
+  beforeEach(() => env.withSecurityRulesDisabled(async ctx => {
+    await setDoc(doc(ctx.firestore(), "patients/p1/members/u-fam"), { role: "family" });
+    await setDoc(doc(ctx.firestore(), "patients/p1/devices/owner-ipad"), { ...device("u-owner"), mode: "care" });
+  }));
+  it("a member registers their own device and everyone on the log can read the list", async () => {
+    await assertSucceeds(setDoc(doc(family(), "patients/p1/devices/fam-phone"), device("u-fam")));
+    await assertSucceeds(getDocs(collection(family(), "patients/p1/devices")));
+    await assertSucceeds(getDocs(collection(as.owner(), "patients/p1/devices")));
+  });
+  it("nobody can register a device as someone else, or take over theirs", async () => {
+    await assertFails(setDoc(doc(family(), "patients/p1/devices/fake"), device("u-owner")));
+    await assertFails(setDoc(doc(family(), "patients/p1/devices/owner-ipad"), device("u-fam")));
+  });
+  it("someone not on the log can't read or add devices", async () => {
+    await assertFails(getDocs(collection(outsider(), "patients/p1/devices")));
+    await assertFails(setDoc(doc(outsider(), "patients/p1/devices/x"), device("u-out")));
+  });
+  it("people remove their own devices; the owner can remove any", async () => {
+    await assertFails(deleteDoc(doc(family(), "patients/p1/devices/owner-ipad")));
+    await assertSucceeds(setDoc(doc(family(), "patients/p1/devices/fam-phone"), device("u-fam")));
+    await assertSucceeds(deleteDoc(doc(family(), "patients/p1/devices/fam-phone")));
+    await assertSucceeds(setDoc(doc(family(), "patients/p1/devices/fam-phone"), device("u-fam")));
+    await assertSucceeds(deleteDoc(doc(as.owner(), "patients/p1/devices/fam-phone")));
+  });
+});
